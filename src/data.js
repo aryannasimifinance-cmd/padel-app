@@ -10,7 +10,7 @@ export const SPORTS = [
   },
   {
     id: 'tennis', name: 'تنیس', en: 'TENNIS', color: '#D9643A', soft: '#FBE7DE',
-    img: img('tennis-clay'), alt: img('tennis-courts'),
+    img: img('tennis-player'), alt: img('tennis-courts'),
     tagline: 'کلاسیک، روی خاک یا هارد',
     formats: [{ id: 'singles', name: 'انفرادی', players: 2 }, { id: 'doubles', name: 'دونفره', players: 4 }],
   },

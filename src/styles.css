@@ -175,18 +175,21 @@ h1, h2, h3, b, strong { font-weight: 700; }
 .auth { position: absolute; inset: 0; color: #fff; overflow: hidden; }
 .auth-bg, .auth-bg-img, .auth-bg-img .photo { position: absolute; inset: 0; }
 .auth-bg-img .photo { background: #111; }
-.auth-bg-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(14, 15, 12, .25) 0%, rgba(14, 15, 12, .35) 40%, rgba(14, 15, 12, .95) 100%); }
+.auth-bg-shade { position: absolute; inset: 0; transition: background .6s; background: linear-gradient(180deg, rgba(14, 15, 12, .55) 0%, rgba(14, 15, 12, .1) 22%, rgba(14, 15, 12, .35) 42%, rgba(14, 15, 12, .88) 62%, rgba(14, 15, 12, .98) 100%); }
+.auth-bg-shade.dim { background: linear-gradient(180deg, rgba(14, 15, 12, .5), rgba(14, 15, 12, .75)); }
+/* خوانایی متن روی عکس‌ها */
+.welcome-copy, .brand, .sport-card-txt, .act-txt, .hero-txt h2, .teaser-txt, .ticket-img h2, .sport-tile-name, .tour-intro > div:last-child, .done { text-shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 4px 24px rgba(0, 0, 0, .45); }
 .auth-pane { position: absolute; inset: 0; overflow-y: auto; padding: calc(18px + env(safe-area-inset-top, 0px)) 18px calc(18px + var(--safe-b)); display: flex; flex-direction: column; justify-content: flex-end; scrollbar-width: none; }
 .auth-pane.welcome { justify-content: stretch; }
 .welcome-in { display: flex; flex-direction: column; min-height: 100%; }
 .brand { font-weight: 900; font-size: 22px; display: flex; align-items: center; gap: 8px; }
 .welcome-copy { margin-top: auto; padding-bottom: 26px; }
 .sport-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
-.sport-tags span { font-size: 12px; padding: 5px 11px; border-radius: 999px; background: rgba(255, 255, 255, .14); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, .2); }
+.sport-tags span { font-size: 12px; padding: 5px 11px; border-radius: 999px; background: rgba(14, 15, 12, .45); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, .2); }
 .welcome-copy h1 { font-size: clamp(40px, 12vw, 52px); line-height: 1.12; font-weight: 900; letter-spacing: -.02em; display: grid; }
 .welcome-copy h1 span { display: block; }
 .welcome-copy h1 .hl { color: var(--lime); }
-.welcome-copy p { margin-top: 14px; font-size: 15px; line-height: 1.9; max-width: 340px; }
+.welcome-copy p { margin-top: 14px; font-size: 15px; line-height: 1.9; max-width: 340px; color: rgba(255, 255, 255, .88); }
 .welcome-cta { display: grid; gap: 10px; }
 .tiny { font-size: 11px; opacity: .55; text-align: center; margin-top: 4px; }
 .auth-card { border-radius: 30px; padding: 16px 18px 22px; color: var(--ink); background: rgba(243, 241, 234, .94); backdrop-filter: blur(30px) saturate(1.5); box-shadow: var(--shadow-lg); max-height: 100%; overflow-y: auto; scrollbar-width: none; }
@@ -214,7 +217,7 @@ h1, h2, h3, b, strong { font-weight: 700; }
 .sport-grid-sm { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sport-tile { position: relative; height: 110px; border-radius: 20px; overflow: hidden; color: #fff; outline: 3px solid transparent; outline-offset: 2px; transition: outline-color .2s; }
 .sport-tile .photo { position: absolute; inset: 0; }
-.sport-tile::after { content: ''; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0, 0, 0, .7), transparent 70%); }
+.sport-tile::after { content: ''; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0, 0, 0, .85), transparent 75%); }
 .sport-tile.on { outline-color: var(--c); }
 .sport-tile-name { position: absolute; bottom: 10px; right: 12px; z-index: 1; font-weight: 900; font-size: 16px; }
 .tick { position: absolute; top: 8px; left: 8px; z-index: 1; width: 28px; height: 28px; border-radius: 50%; background: var(--lime); color: var(--ink); display: grid; place-items: center; }
@@ -267,7 +270,7 @@ h1, h2, h3, b, strong { font-weight: 700; }
 .hero { position: relative; height: 230px; border-radius: 28px; overflow: hidden; color: #fff; cursor: pointer; box-shadow: var(--shadow-lg); }
 .hero-media, .hero-media .photo { position: absolute; inset: -20px 0; }
 .hero-media .photo { inset: 0; }
-.hero-shade { position: absolute; inset: 0; background: linear-gradient(200deg, rgba(14, 15, 12, 0) 20%, rgba(14, 15, 12, .85) 100%); }
+.hero-shade { position: absolute; inset: 0; background: linear-gradient(200deg, rgba(14, 15, 12, .1) 10%, rgba(14, 15, 12, .6) 50%, rgba(14, 15, 12, .92) 100%); }
 .hero-txt { position: absolute; inset: auto 20px 20px 20px; display: grid; gap: 8px; justify-items: start; }
 .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .04em; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, .16); backdrop-filter: blur(10px); }
 .hero h2 { font-size: 25px; font-weight: 900; line-height: 1.35; }
@@ -333,7 +336,7 @@ h1, h2, h3, b, strong { font-weight: 700; }
 .sport-card .photo { position: absolute; inset: 0; }
 .sport-card .photo img { transition: transform .8s var(--ease); }
 .sport-card:hover .photo img { transform: scale(1.06); }
-.sport-card-shade { position: absolute; inset: 0; background: linear-gradient(270deg, rgba(14, 15, 12, .85), rgba(14, 15, 12, .1) 75%); }
+.sport-card-shade { position: absolute; inset: 0; background: linear-gradient(270deg, rgba(14, 15, 12, .92) 0%, rgba(14, 15, 12, .6) 45%, rgba(14, 15, 12, .12) 85%); }
 .sport-card-txt { position: absolute; top: 50%; right: 20px; transform: translateY(-50%) translateZ(30px); display: grid; gap: 2px; }
 .sport-card-txt .en { font-size: 10px; letter-spacing: .3em; opacity: .7; font-weight: 500; }
 .sport-card-txt h3 { font-size: 30px; font-weight: 900; }
@@ -343,7 +346,7 @@ h1, h2, h3, b, strong { font-weight: 700; }
 .act-card { position: relative; height: 150px; border-radius: 24px; overflow: hidden; color: #fff; text-align: right; box-shadow: var(--shadow); }
 .act-card.wide { grid-column: 1 / -1; height: 180px; }
 .act-card .photo { position: absolute; inset: 0; }
-.act-shade { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(14, 15, 12, .9), rgba(14, 15, 12, .15) 80%); }
+.act-shade { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(14, 15, 12, .95) 0%, rgba(14, 15, 12, .6) 45%, rgba(14, 15, 12, .15) 85%); }
 .act-ic { position: absolute; top: 12px; right: 12px; font-size: 20px; width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; background: rgba(255, 255, 255, .18); backdrop-filter: blur(12px); }
 .act-txt { position: absolute; bottom: 14px; right: 14px; left: 14px; display: grid; gap: 2px; }
 .act-txt b { font-size: 17px; font-weight: 900; }

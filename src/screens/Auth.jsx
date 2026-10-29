@@ -7,7 +7,7 @@ import { Button, Icon, LevelPill, Photo, TopBar } from '../components/ui'
 import { Logo } from '../components/Logo'
 
 const toLatin = (s) => s.replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
-const HERO = ['./img/padel-hero.jpg', './img/tennis-clay.jpg', './img/beach-court.jpg', './img/pickleball.jpg']
+const HERO = ['./img/padel-hero.jpg', './img/tennis-player.jpg', './img/beach-court.jpg', './img/pickleball.jpg']
 
 export default function Auth() {
   const { login } = useStore()
@@ -62,14 +62,14 @@ function HeroSlides({ dim }) {
           <Photo src={HERO[i]} zoom />
         </motion.div>
       </AnimatePresence>
-      <motion.div className="auth-bg-shade" animate={{ opacity: dim ? 1 : 0.75 }} />
+      <motion.div className={`auth-bg-shade ${dim ? 'dim' : ''}`} />
       <div className="grain" />
     </div>
   )
 }
 
 function Welcome({ onStart, onLogin }) {
-  const words = ['زمین بگیر.', 'هم‌سطح پیدا کن.', 'ببر.']
+  const words = ['زمین بگیر.', 'یار پیدا کن.', 'عشق کن.']
   return (
     <div className="welcome-in">
       <motion.div className="brand" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
