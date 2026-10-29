@@ -56,7 +56,7 @@ export function Matches({ onStart }) {
             <div className="row-btns">
               <Button variant="ghost" icon="users" onClick={() => {
                 const text = `بیا ${sportById(cur.sport).name} بازی کنیم! ${clubById(cur.clubId).name} · ${dayLabel(fromKey(cur.date))} ساعت ${hourLabel(cur.start)}`
-                if (navigator.share) navigator.share({ title: 'راکت', text }).catch(() => {})
+                if (navigator.share) navigator.share({ title: 'matchy', text }).catch(() => {})
                 else { navigator.clipboard?.writeText(text); toast({ icon: '🔗', title: 'متن دعوت کپی شد' }) }
               }}>دعوت</Button>
               <Button variant="danger" onClick={() => { cancelBooking(cur.id); setSel(null); toast({ icon: '🗑', title: 'رزرو لغو شد', body: 'مبلغ به کیف پولت برگشت.' }) }}>لغو رزرو</Button>

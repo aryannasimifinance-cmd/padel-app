@@ -87,13 +87,19 @@ h1, h2, h3, b, strong { font-weight: 700; }
 .app-scroll::-webkit-scrollbar { display: none; }
 
 /* ---------- اسپلش ---------- */
-.splash { position: absolute; inset: 0; background: var(--ink); color: #fff; display: grid; place-content: center; justify-items: center; gap: 14px; z-index: 10; }
-.splash-ball { width: 64px; height: 64px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 60px rgba(212, 255, 63, .55); position: relative; overflow: hidden; }
-.splash-ball::before, .splash-ball::after { content: ''; position: absolute; width: 70px; height: 70px; border: 3px solid var(--ink); border-radius: 50%; }
-.splash-ball::before { left: -48px; top: -4px; }
-.splash-ball::after { right: -48px; top: -4px; }
-.splash h1 { font-size: 46px; font-weight: 900; }
-.splash p { font-size: 11px; letter-spacing: .3em; }
+.splash { position: absolute; inset: 0; z-index: 90; background: var(--ink); color: #fff; display: grid; place-content: center; justify-items: center; gap: 10px; overflow: hidden; }
+.splash-glow { position: absolute; width: 420px; height: 420px; left: 50%; top: 42%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(212, 255, 63, .22), transparent 65%); animation: glow 2.4s ease-in-out infinite; }
+@keyframes glow { 50% { transform: translate(-50%, -50%) scale(1.15); opacity: .7; } }
+.splash-mark { position: relative; display: grid; place-items: center; width: 220px; height: 120px; }
+.splash-mark svg { filter: drop-shadow(0 0 30px rgba(212, 255, 63, .45)); }
+.sb-wave { position: absolute; left: 50%; top: 50%; width: 80px; height: 80px; margin: -40px 0 0 -32px; border-radius: 50%; border: 2px solid var(--lime); }
+.splash-word { position: relative; display: flex; align-items: flex-end; font-size: 54px; font-weight: 800; letter-spacing: -.045em; line-height: 1; }
+.splash-word span { display: inline-block; }
+.splash-word i { width: 12px; height: 12px; border-radius: 50%; background: var(--lime); margin: 0 0 8px 4px; box-shadow: 0 0 16px var(--lime); }
+.splash p { position: relative; font-size: 14px; margin-top: 6px; }
+.splash-sports { position: absolute; bottom: calc(34px + var(--safe-b)); left: 0; right: 0; text-align: center; font-size: 10px; letter-spacing: .35em; }
+.logo { display: inline-flex; align-items: center; gap: .35em; direction: ltr; }
+.logo-word { font-weight: 800; letter-spacing: -.045em; line-height: 1; }
 
 /* ---------- دکمه‌ها ---------- */
 .btn { position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 54px; padding: 0 22px; border-radius: 18px; font-weight: 800; font-size: 15px; transition: background .25s, opacity .25s, box-shadow .25s; isolation: isolate; white-space: nowrap; }
@@ -174,7 +180,6 @@ h1, h2, h3, b, strong { font-weight: 700; }
 .auth-pane.welcome { justify-content: stretch; }
 .welcome-in { display: flex; flex-direction: column; min-height: 100%; }
 .brand { font-weight: 900; font-size: 22px; display: flex; align-items: center; gap: 8px; }
-.brand-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 20px var(--lime); }
 .welcome-copy { margin-top: auto; padding-bottom: 26px; }
 .sport-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .sport-tags span { font-size: 12px; padding: 5px 11px; border-radius: 999px; background: rgba(255, 255, 255, .14); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, .2); }

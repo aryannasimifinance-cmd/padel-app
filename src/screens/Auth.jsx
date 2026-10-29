@@ -4,20 +4,10 @@ import { CITIES, LEVELS, SPORTS, fa } from '../data'
 import { celebrate, chime, haptic } from '../fx'
 import { useStore } from '../store'
 import { Button, Icon, LevelPill, Photo, TopBar } from '../components/ui'
+import { Logo } from '../components/Logo'
 
 const toLatin = (s) => s.replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
 const HERO = ['./img/padel-hero.jpg', './img/tennis-clay.jpg', './img/beach-court.jpg', './img/pickleball.jpg']
-
-export function Splash() {
-  return (
-    <motion.div className="splash" exit={{ opacity: 0, scale: 1.05 }} transition={{ duration: 0.5 }}>
-      <motion.div className="splash-ball" initial={{ y: -260, scale: 0.6 }} animate={{ y: [-260, 0, -70, 0, -18, 0], scale: [0.6, 1, 1, 1, 1, 1] }}
-        transition={{ duration: 1.1, times: [0, 0.35, 0.55, 0.72, 0.86, 1], ease: 'easeOut' }} />
-      <motion.h1 initial={{ opacity: 0, letterSpacing: '0.6em' }} animate={{ opacity: 1, letterSpacing: '0.02em' }} transition={{ delay: 0.7, duration: 0.8 }}>راکت</motion.h1>
-      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 0.6 }} transition={{ delay: 1 }}>PADEL · TENNIS · BEACH · PICKLE</motion.p>
-    </motion.div>
-  )
-}
 
 export default function Auth() {
   const { login } = useStore()
@@ -83,7 +73,7 @@ function Welcome({ onStart, onLogin }) {
   return (
     <div className="welcome-in">
       <motion.div className="brand" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <span className="brand-dot" /> راکت
+        <Logo light size={24} />
       </motion.div>
       <div className="welcome-copy">
         <div className="sport-tags">

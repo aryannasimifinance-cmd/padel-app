@@ -4,7 +4,8 @@ import { clubById, dayLabel, fa, fromKey, hourLabel, openMatches, randomPlayer, 
 import { chime, haptic, systemNotify } from './fx'
 import { useStore } from './store'
 import { Icon, Toasts } from './components/ui'
-import Auth, { Splash } from './screens/Auth'
+import Auth from './screens/Auth'
+import { Splash } from './components/Logo'
 import Home from './screens/Home'
 import { Matches, Notifications, Profile } from './screens/Tabs'
 import Wizard from './screens/wizard/Wizard'
@@ -12,14 +13,14 @@ import Wizard from './screens/wizard/Wizard'
 export default function App() {
   const { user } = useStore()
   const [splash, setSplash] = useState(true)
-  useEffect(() => { const t = setTimeout(() => setSplash(false), 1900); return () => clearTimeout(t) }, [])
+  useEffect(() => { const t = setTimeout(() => setSplash(false), 2700); return () => clearTimeout(t) }, [])
   return (
     <div className="stage">
       <div className="stage-bg" style={{ backgroundImage: "url(./img/padel-hero.jpg)" }} />
       <div className="app">
-        <AnimatePresence mode="wait">
-          {splash ? <Splash key="s" /> : user ? <Main key="m" /> : <Auth key="a" />}
-        </AnimatePresence>
+        {/* Main بدون انیمیشن خروج حذف می‌شود تا بعد از خروج از حساب با user خالی رندر نشود */}
+        {!splash && (user ? <Main key="m" /> : <Auth key="a" />)}
+        <AnimatePresence>{splash && <Splash key="s" />}</AnimatePresence>
         <Toasts />
         <div id="portal" />
       </div>
@@ -38,7 +39,8 @@ const TABS = [
 function Main() {
   const { notifications } = useStore()
   const [tab, setTab] = useState('home')
-  const [wizard, setWizard] = useState(null)
+  // اپ مستقیم از ساخت بازی/رزرو شروع می‌شود؛ بستن ویزارد به خانه می‌رود
+  const [wizard, setWizard] = useState({})
   const scrollRef = useRef(null)
   const unread = notifications.filter((n) => !n.read).length
   useMatchmaking(setTab)
@@ -109,7 +111,7 @@ function useMatchmaking(setTab) {
       const body = `${player.name} (سطح ${player.level} · ${fa(player.games)} بازی) می‌خواد به ${sport.name} شما در ${club.name} بپیونده.`
       notify({ id, type: 'join', bookingId: b.id, player, icon: '🙋', title: 'درخواست پیوستن', body })
       chime('alarm'); haptic([60, 40, 60, 40, 120])
-      systemNotify('راکت · درخواست پیوستن', body)
+      systemNotify('matchy · درخواست پیوستن', body)
       toast({ icon: '🙋', title: `${player.name} می‌خواد بازی کنه`, body: `سطح ${player.level} · ${sport.name}`, duration: 6000,
         action: { label: 'قبول', run: () => { acceptJoin(id); chime('success') } } })
     }, 9000)
@@ -126,7 +128,7 @@ function useMatchmaking(setTab) {
       const body = `${sport.name} در ${club.name} · ${dayLabel(fromKey(m.date))} ساعت ${hourLabel(m.start)} — دنبال ${fa(m.total - m.players.length)} بازیکن سطح ${m.levels.join(' / ')}`
       notify({ icon: '📣', title: 'بازی هم‌سطح تو پیدا شد', body })
       chime('alarm'); haptic([40, 30, 40])
-      systemNotify('راکت · بازی هم‌سطح', body)
+      systemNotify('matchy · بازی هم‌سطح', body)
       toast({ icon: '📣', title: 'بازی هم‌سطح تو پیدا شد', body: `${sport.name} · ${club.name}`, duration: 5500, action: { label: 'ببین', run: () => setTab('home') } })
     }, 14000)
     return () => clearTimeout(t)

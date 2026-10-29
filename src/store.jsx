@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { sportById } from './data'
 
-const KEY = 'raket-v1'
+const KEY = 'matchy-v1'
 const initial = { user: null, xp: 0, badges: [], bookings: [], notifications: [] }
 
 function load() {
@@ -39,7 +39,10 @@ export function StoreProvider({ children }) {
         }],
       }))
     },
-    logout() { setState(initial) },
+    logout() {
+      try { localStorage.removeItem(KEY) } catch { /* حالت خصوصی مرورگر */ }
+      setState(initial)
+    },
     updateUser(patch) { setState((s) => ({ ...s, user: { ...s.user, ...patch } })) },
 
     // ثبت رزرو + محاسبه امتیاز و نشان‌های جدید (از آخرین state تا نتیجه همزمان برگردد)
