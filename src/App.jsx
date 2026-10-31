@@ -1,22 +1,23 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
-import { clubById, dayLabel, fa, fromKey, hourLabel, openMatches, randomPlayer, sportById } from './data'
+import { clubById, dayLabel, fa, hourLabel, levelOf, openMatches, randomPlayer, sportById } from './data'
 import { chime, haptic, systemNotify } from './fx'
 import { useStore } from './store'
 import { Icon, Toasts } from './components/ui'
-import Auth from './screens/Auth'
 import { Splash } from './components/Logo'
+import Auth from './screens/Auth'
 import Home from './screens/Home'
+import Explore from './screens/Explore'
+import Club from './screens/Club'
 import { Matches, Notifications, Profile } from './screens/Tabs'
 import Wizard from './screens/wizard/Wizard'
 
 export default function App() {
   const { user } = useStore()
   const [splash, setSplash] = useState(true)
-  useEffect(() => { const t = setTimeout(() => setSplash(false), 2700); return () => clearTimeout(t) }, [])
+  useEffect(() => { const t = setTimeout(() => setSplash(false), 2900); return () => clearTimeout(t) }, [])
   return (
     <div className="stage">
-      <div className="stage-bg" style={{ backgroundImage: "url(./img/padel-hero.jpg)" }} />
       <div className="app">
         {/* Main بدون انیمیشن خروج حذف می‌شود تا بعد از خروج از حساب با user خالی رندر نشود */}
         {!splash && (user ? <Main key="m" /> : <Auth key="a" />)}
@@ -30,64 +31,71 @@ export default function App() {
 
 const TABS = [
   { id: 'home', name: 'خانه', icon: 'home' },
-  { id: 'matches', name: 'بازی‌ها', icon: 'cal' },
+  { id: 'explore', name: 'نقشه', icon: 'map' },
   { id: 'new', name: '', icon: 'plus' },
-  { id: 'notifs', name: 'اعلان‌ها', icon: 'bell' },
-  { id: 'profile', name: 'من', icon: 'user' },
+  { id: 'games', name: 'بازی‌ها', icon: 'cal' },
+  { id: 'me', name: 'من', icon: 'user' },
 ]
+const PAGES = { club: Club, notifs: Notifications }
 
 function Main() {
-  const { notifications } = useStore()
+  const { bookings } = useStore()
   const [tab, setTab] = useState('home')
-  // اپ مستقیم از ساخت بازی/رزرو شروع می‌شود؛ بستن ویزارد به خانه می‌رود
+  const [page, setPage] = useState(null)
+  // اپ مستقیم از صفحه‌ی «+» باز می‌شود؛ نوار پایین همیشه دیده می‌شود
   const [wizard, setWizard] = useState({})
+  const [wzKey, setWzKey] = useState(0)
   const scrollRef = useRef(null)
-  const unread = notifications.filter((n) => !n.read).length
+  const upcoming = bookings.filter((b) => b.status !== 'cancelled' && b.open).length
   useMatchmaking(setTab)
 
-  const go = (t) => {
-    if (t === 'new') { setWizard({}); return }
-    haptic(6); setTab(t); scrollRef.current?.scrollTo({ top: 0 })
+  const top = () => scrollRef.current?.scrollTo({ top: 0 })
+  const nav = {
+    tab: (t) => { setPage(null); setWizard(null); haptic(6); setTab(t); top() },
+    open: (name, props = {}) => { haptic(6); setWizard(null); setPage({ name, props }); top() },
+    start: (preset = {}) => { setWizard(preset); setWzKey((k) => k + 1); top() },
   }
+  const Page = page && PAGES[page.name]
+  const view = wizard ? 'wizard' : Page ? 'page' : tab
 
   return (
-    <motion.div className="main" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <div className="app-scroll" ref={scrollRef}>
+    <motion.div className="main" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <div className={`app-scroll ${view === 'explore' ? 'locked' : ''}`} ref={scrollRef}>
         <AnimatePresence mode="wait">
           {wizard ? (
-            <motion.div key="wz" initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 32 }}>
-              <Wizard preset={wizard} onClose={() => setWizard(null)} onDone={(t) => { setWizard(null); setTab(t) }} />
+            <motion.div key={'wz' + wzKey} initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+              <Wizard preset={wizard} nav={nav} onClose={() => setWizard(null)} onDone={(t) => { setWizard(null); setPage(null); setTab(t) }} />
+            </motion.div>
+          ) : Page ? (
+            <motion.div key={'p' + page.name + (page.props.id || '')} initial={{ x: -24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+              <Page {...page.props} nav={nav} onBack={() => setPage(null)} />
             </motion.div>
           ) : (
-            <motion.div key={tab} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25 }}>
-              {tab === 'home' && <Home onStart={setWizard} onTab={go} scrollRef={scrollRef} />}
-              {tab === 'matches' && <Matches onStart={setWizard} />}
-              {tab === 'notifs' && <Notifications />}
-              {tab === 'profile' && <Profile />}
+            <motion.div key={tab} className={tab === 'explore' ? 'fill' : ''} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+              {tab === 'home' && <Home nav={nav} />}
+              {tab === 'explore' && <Explore nav={nav} />}
+              {tab === 'games' && <Matches nav={nav} />}
+              {tab === 'me' && <Profile nav={nav} />}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-      <AnimatePresence>
-        {!wizard && (
-          <motion.nav className="nav" initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
-            {TABS.map((t) => t.id === 'new' ? (
-              <motion.button key={t.id} className="fab" whileTap={{ scale: 0.85, rotate: 90 }} whileHover={{ scale: 1.06 }} onClick={() => go('new')} aria-label="رزرو جدید">
-                <Icon name="plus" size={28} stroke={2.6} />
-              </motion.button>
-            ) : (
-              <button key={t.id} className={`nav-i ${tab === t.id ? 'on' : ''}`} onClick={() => go(t.id)}>
-                {tab === t.id && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: 'spring', stiffness: 500, damping: 35 }} />}
-                <span className="nav-ic">
-                  <Icon name={t.icon} size={22} />
-                  {t.id === 'notifs' && unread > 0 && <i className="nav-dot" />}
-                </span>
-                <small>{t.name}</small>
-              </button>
-            ))}
-          </motion.nav>
-        )}
-      </AnimatePresence>
+      <nav className="nav">
+        {TABS.map((t) => t.id === 'new' ? (
+          <motion.button key={t.id} className={`fab ${wizard ? 'on' : ''}`} whileTap={{ scale: 0.85, rotate: 90 }} onClick={() => nav.start({})} aria-label="رزرو جدید">
+            <Icon name="plus" size={26} stroke={2.6} />
+          </motion.button>
+        ) : (
+          <button key={t.id} className={`nav-i ${view === t.id ? 'on' : ''}`} onClick={() => nav.tab(t.id)}>
+            <span className="nav-ic">
+              {view === t.id && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: 'spring', stiffness: 500, damping: 35 }} />}
+              <Icon name={t.icon} size={21} />
+              {t.id === 'games' && upcoming > 0 && <i className="nav-dot" />}
+            </span>
+            <small>{t.name}</small>
+          </button>
+        ))}
+      </nav>
     </motion.div>
   )
 }
@@ -101,18 +109,18 @@ function useMatchmaking(setTab) {
   useEffect(() => {
     const t = setInterval(() => {
       const { bookings, notifications, notify, toast, acceptJoin } = live.current
-      const waiting = bookings.filter((b) => b.open && b.players?.some((p) => !p.name) &&
+      const waiting = bookings.filter((b) => b.status !== 'cancelled' && b.open && b.visibility !== 'private' && b.players?.some((p) => !p.name) &&
         !notifications.some((n) => n.type === 'join' && n.bookingId === b.id && !n.resolved))
       if (!waiting.length || Math.random() < 0.35) return
       const b = waiting[Math.floor(Math.random() * waiting.length)]
       const player = randomPlayer(String(Date.now()), b.levels)
       const club = clubById(b.clubId), sport = sportById(b.sport)
       const id = 'n' + Date.now()
-      const body = `${player.name} (سطح ${player.level} · ${fa(player.games)} بازی) می‌خواد به ${sport.name} شما در ${club.name} بپیونده.`
+      const body = `${player.name} (سطح ${player.level}، ${fa(player.games)} بازی) می‌خواد به ${sport.name} شما در ${club.name} بپیونده.`
       notify({ id, type: 'join', bookingId: b.id, player, icon: '🙋', title: 'درخواست پیوستن', body })
       chime('alarm'); haptic([60, 40, 60, 40, 120])
-      systemNotify('matchy · درخواست پیوستن', body)
-      toast({ icon: '🙋', title: `${player.name} می‌خواد بازی کنه`, body: `سطح ${player.level} · ${sport.name}`, duration: 6000,
+      systemNotify('matchy، درخواست پیوستن', body)
+      toast({ icon: '🙋', title: `${player.name} می‌خواد بازی کنه`, body: `سطح ${player.level}، ${sport.name}`, duration: 6000,
         action: { label: 'قبول', run: () => { acceptJoin(id); chime('success') } } })
     }, 9000)
     return () => clearInterval(t)
@@ -122,16 +130,16 @@ function useMatchmaking(setTab) {
   useEffect(() => {
     const t = setTimeout(() => {
       const { user, notify, toast } = live.current
-      const m = openMatches(user.city, user.level)[0]
+      const sport = user.sports?.[0] || 'padel'
+      const m = openMatches({ city: user.city, sport, level: levelOf(user, sport) }).find((x) => x.gap === 0)
       if (!m) return
-      const club = clubById(m.clubId), sport = sportById(m.sport)
-      const body = `${sport.name} در ${club.name} · ${dayLabel(fromKey(m.date))} ساعت ${hourLabel(m.start)} — دنبال ${fa(m.total - m.players.length)} بازیکن سطح ${m.levels.join(' / ')}`
+      const club = clubById(m.clubId), s = sportById(m.sport)
+      const body = `${s.name} در ${club.name}، ${dayLabel(m.date)} ساعت ${hourLabel(m.start)} — دنبال ${fa(m.total - m.players.length)} بازیکن سطح ${m.levels.join(' / ')}`
       notify({ icon: '📣', title: 'بازی هم‌سطح تو پیدا شد', body })
       chime('alarm'); haptic([40, 30, 40])
-      systemNotify('matchy · بازی هم‌سطح', body)
-      toast({ icon: '📣', title: 'بازی هم‌سطح تو پیدا شد', body: `${sport.name} · ${club.name}`, duration: 5500, action: { label: 'ببین', run: () => setTab('home') } })
-    }, 14000)
+      systemNotify('matchy، بازی هم‌سطح', body)
+      toast({ icon: '📣', title: 'بازی هم‌سطح تو پیدا شد', body: `${s.name}، ${club.name}`, duration: 5500, action: { label: 'ببین', run: () => setTab('home') } })
+    }, 15000)
     return () => clearTimeout(t)
   }, [])
 }
-

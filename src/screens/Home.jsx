@@ -1,21 +1,23 @@
-import { motion, useScroll, useTransform } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useMemo, useState } from 'react'
-import { CITIES, SPORTS, activityById, clubById, dayLabel, dayMonth, fa, fromKey, hourLabel, openMatches, rankOf, sportById, toman, tournaments } from '../data'
-import { celebrate, chime, haptic } from '../fx'
+import { CITIES, CLUBS, clubById, dayLabel, dayMonth, fa, fromKey, hourLabel, levelOf, openMatches, rankOf, sportById, todayKey, toman, tournaments } from '../data'
+import { haptic } from '../fx'
 import { useStore } from '../store'
-import { Avatar, Button, CountUp, Icon, LevelPill, Photo, Sheet, rise, stagger } from '../components/ui'
+import { Avatar, Chips, CountUp, Icon, LevelPill, SecHead, rise, stagger } from '../components/ui'
+import { CourtArt } from '../components/Art'
+import { ClubCard } from './Explore'
+import { GameCard } from './wizard/Wizard'
 
-export default function Home({ onStart, onTab, scrollRef }) {
+export default function Home({ nav }) {
   const { user, xp, bookings, notifications, updateUser } = useStore()
   const rank = rankOf(xp)
   const unread = notifications.filter((n) => !n.read).length
-  const upcoming = bookings.filter((b) => fromKey(b.date) >= new Date(new Date().setHours(0, 0, 0, 0))).sort((a, b) => fromKey(a.date) - fromKey(b.date) || a.start - b.start)
-  const { scrollY } = useScroll({ container: scrollRef })
-  const heroY = useTransform(scrollY, [0, 300], [0, 60])
-  const heroS = useTransform(scrollY, [0, 300], [1, 1.12])
+  const today = new Date(new Date().setHours(0, 0, 0, 0))
+  const upcoming = bookings.filter((b) => b.status !== 'cancelled' && fromKey(b.date) >= today).sort((a, b) => fromKey(a.date) - fromKey(b.date) || a.start - b.start)
   const hour = new Date().getHours()
   const hello = hour < 12 ? 'صبح بخیر' : hour < 17 ? 'روز بخیر' : 'عصر بخیر'
   const city = CITIES.find((c) => c.id === user.city)
+  const sports = user.sports?.length ? user.sports : ['padel']
 
   return (
     <motion.div className="home" variants={stagger} initial="hidden" animate="show">
@@ -28,90 +30,75 @@ export default function Home({ onStart, onTab, scrollRef }) {
           <motion.button className="city-pill" whileTap={{ scale: 0.92 }} onClick={() => { haptic(8); updateUser({ city: user.city === 'tehran' ? 'karaj' : 'tehran' }) }}>
             <Icon name="pin" size={16} /> {city.name}
           </motion.button>
-          <motion.button className="icon-btn bell" whileTap={{ scale: 0.85 }} onClick={() => onTab('notifs')} aria-label="اعلان‌ها">
+          <motion.button className="icon-btn" whileTap={{ scale: 0.85 }} onClick={() => nav.open('notifs')} aria-label="اعلان‌ها">
             <Icon name="bell" />
             {unread > 0 && <motion.span className="badge-dot" key={unread} initial={{ scale: 0 }} animate={{ scale: [0, 1.4, 1] }}>{fa(unread)}</motion.span>}
           </motion.button>
         </div>
       </motion.header>
 
-      <motion.div variants={rise} className="rank-card" onClick={() => onTab('profile')}>
-        <Ring progress={rank.progress} />
-        <div className="grow">
-          <small>رتبه</small>
-          <b>{rank.name}</b>
-          <div className="xpbar"><motion.i initial={{ width: 0 }} animate={{ width: `${rank.progress * 100}%` }} transition={{ duration: 1.2, delay: 0.3, ease: [0.2, 0.7, 0.2, 1] }} /></div>
-          <small className="muted">{rank.next ? <><CountUp to={xp} /> / {fa(rank.next.xp)} تا «{rank.next.name}»</> : 'به اوج رسیدی!'}</small>
+      <motion.div variants={rise} className="poster">
+        <CourtArt className="poster-art" bounce={false} />
+        <div className="poster-txt">
+          <span className="eyebrow">{fa(CLUBS.filter((c) => c.city === user.city).length)} باشگاه در {city.name}</span>
+          <h2>امروز کجا<br />بازی کنیم؟</h2>
+          <div className="poster-btns">
+            <motion.button className="pb pb-ink" whileTap={{ scale: 0.95 }} onClick={() => nav.tab('explore')}><Icon name="map" size={18} /> روی نقشه</motion.button>
+            <motion.button className="pb" whileTap={{ scale: 0.95 }} onClick={() => nav.start({})}><Icon name="bolt" size={18} /> رزرو سریع</motion.button>
+          </div>
         </div>
-        <div className="rank-lv"><LevelPill id={user.level} big /><small>سطح</small></div>
       </motion.div>
 
-      <motion.div variants={rise} className="hero" onClick={() => onStart({})}>
-        <motion.div className="hero-media" style={{ y: heroY, scale: heroS }}>
-          <Photo src="./img/padel-aerial.jpg" />
-        </motion.div>
-        <div className="hero-shade" />
-        <div className="hero-txt">
-          <span className="eyebrow">رزرو در ۴ قدم</span>
-          <h2>زمین آزاد پیدا کن،<br />تیمت رو بچین.</h2>
-          <motion.span className="hero-btn" whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }}>
-            رزرو جدید <Icon name="plus" size={18} stroke={2.6} />
-          </motion.span>
-        </div>
-        <div className="hero-shine" />
+      <motion.div variants={rise} className="my-levels">
+        {sports.map((id) => {
+          const s = sportById(id)
+          return (
+            <motion.button key={id} className="my-lv" style={{ '--c': s.color }} whileTap={{ scale: 0.94 }} onClick={() => nav.start({ sport: id })}>
+              <i /><span>{s.name}</span><LevelPill id={levelOf(user, id)} />
+            </motion.button>
+          )
+        })}
+        <button className="my-lv xp" onClick={() => nav.tab('me')}>
+          <span>{rank.name}</span><b><CountUp to={xp} /> XP</b>
+        </button>
       </motion.div>
+
+      {upcoming[0] && (
+        <motion.section variants={rise}>
+          <SecHead n={1} title="بازی بعدی‌ات"><button className="link" onClick={() => nav.tab('games')}>همه</button></SecHead>
+          <NextUp b={upcoming[0]} onClick={() => nav.tab('games')} />
+        </motion.section>
+      )}
+
+      <OpenFeed nav={nav} sports={sports} />
 
       <motion.section variants={rise}>
-        <div className="sec-h"><h3>یه راست برو سراغ</h3></div>
-        <div className="quick">
-          {SPORTS.map((s) => (
-            <motion.button key={s.id} className="quick-s" whileTap={{ scale: 0.9 }} whileHover={{ y: -3 }} onClick={() => onStart({ sport: s.id, format: s.formats[0].id })} style={{ '--c': s.color }}>
-              <Photo src={s.img} />
-              <span>{s.name}</span>
-            </motion.button>
+        <SecHead n={3} title={`محبوب‌های ${city.name}`}><button className="link" onClick={() => nav.tab('explore')}>نقشه</button></SecHead>
+        <div className="rail">
+          {CLUBS.filter((c) => c.city === user.city && sports.some((s) => c.courts[s])).sort((a, b) => b.rating - a.rating).slice(0, 6).map((c) => (
+            <ClubCard key={c.id} c={c} sport={sports.find((s) => c.courts[s])} onClick={() => nav.open('club', { id: c.id, sport: sports.find((s) => c.courts[s]) })} />
           ))}
         </div>
       </motion.section>
 
-      {upcoming[0] && (
-        <motion.section variants={rise}>
-          <div className="sec-h"><h3>بازی بعدی‌ات</h3><button className="link" onClick={() => onTab('matches')}>همه</button></div>
-          <NextUp b={upcoming[0]} onClick={() => onTab('matches')} />
-        </motion.section>
-      )}
-
-      <OpenFeed />
-
-      <WeekendTeaser onStart={onStart} />
+      <WeekendTeaser nav={nav} sport={sports[0]} />
     </motion.div>
-  )
-}
-
-function Ring({ progress }) {
-  const r = 26, c = 2 * Math.PI * r
-  return (
-    <svg width="64" height="64" viewBox="0 0 64 64" className="ring">
-      <circle cx="32" cy="32" r={r} stroke="rgba(255,255,255,.12)" strokeWidth="6" fill="none" />
-      <motion.circle cx="32" cy="32" r={r} stroke="var(--lime)" strokeWidth="6" fill="none" strokeLinecap="round"
-        strokeDasharray={c} initial={{ strokeDashoffset: c }} animate={{ strokeDashoffset: c * (1 - progress) }} transition={{ duration: 1.4, ease: [0.2, 0.7, 0.2, 1] }}
-        transform="rotate(-90 32 32)" />
-      <text x="32" y="38" textAnchor="middle" fontSize="18">🎾</text>
-    </svg>
   )
 }
 
 export function NextUp({ b, onClick }) {
   const s = sportById(b.sport), c = clubById(b.clubId), d = fromKey(b.date)
   const empty = b.players?.filter((p) => !p.name).length || 0
+  const name = { court: 'رزرو زمین', open: 'بازی باز', join: 'بازی باز', coach: 'کلاس با مربی', event: b.title }[b.kind]
   return (
     <motion.div className="next" whileTap={{ scale: 0.98 }} onClick={onClick} style={{ '--c': s.color }}>
       <div className="next-date"><small>{dayLabel(d)}</small><b>{hourLabel(b.start)}</b></div>
       <div className="grow">
-        <b>{b.title || `${activityById(b.kind).name} ${s.name}`}</b>
-        <p className="muted">{c.name} · {c.area}</p>
+        <b>{name}، {s.name}</b>
+        <p className="muted">{c.name}، زمین {fa(b.court)}</p>
         {b.players && b.players.length > 1 && (
           <div className="mini-av">
-            {b.players.map((p, k) => (p.name ? <Avatar key={k} name={p.name} me={p.me} size={26} /> : <span key={k} className="mini-empty" />))}
+            {b.players.map((p, k) => (p.name ? <Avatar key={k} name={p.name} me={p.me} size={24} /> : <span key={k} className="mini-empty" />))}
             {empty > 0 && b.open && <span className="searching-tag"><i /> دنبال {fa(empty)} نفر</span>}
           </div>
         )}
@@ -120,86 +107,45 @@ export function NextUp({ b, onClick }) {
   )
 }
 
-function OpenFeed() {
-  const { user, bookings, addBooking, notify } = useStore()
-  const [sel, setSel] = useState(null)
-  const joined = new Set(bookings.map((b) => b.sourceId))
-  const list = useMemo(() => openMatches(user.city, user.level), [user.city, user.level])
-    .filter((m) => !joined.has(m.id) && (user.sports?.length ? user.sports.includes(m.sport) : true)).slice(0, 10)
-  const join = (m) => {
-    const club = clubById(m.clubId)
-    const players = [...m.players, { name: user.name, level: user.level, me: true }]
-    while (players.length < m.total) players.push({})
-    addBooking({ id: 'b' + Date.now(), sourceId: m.id, kind: 'game', joined: true, sport: m.sport, clubId: m.clubId, date: m.date, start: m.start, duration: m.duration, total: m.total, players, levels: m.levels, open: players.some((p) => !p.name), price: m.price * m.total, share: m.price, court: 2, createdAt: Date.now() }, 40)
-    notify({ icon: '🤝', title: 'به بازی پیوستی', body: `${sportById(m.sport).name} · ${club.name} · ${dayLabel(fromKey(m.date))} ساعت ${hourLabel(m.start)}` })
-    celebrate(); chime('success'); haptic([20, 40, 20])
-    setSel(null)
-  }
-  if (!list.length) return null
+function OpenFeed({ nav, sports }) {
+  const { user, joined } = useStore()
+  const [sport, setSport] = useState(sports[0])
+  const list = useMemo(() => openMatches({ city: user.city, sport, level: levelOf(user, sport) }), [user.city, sport, user.levels])
+    .filter((m) => !joined.includes(m.id) && m.gap <= 1).slice(0, 8)
   return (
     <motion.section variants={rise}>
-      <div className="sec-h"><h3>بازی‌های باز هم‌سطح تو</h3><span className="live"><i /> زنده</span></div>
-      <div className="feed">
-        {list.map((m, k) => {
-          const s = sportById(m.sport), c = clubById(m.clubId), d = fromKey(m.date)
-          const empty = m.total - m.players.length
-          return (
-            <motion.button key={m.id} className="om" style={{ '--c': s.color }} whileTap={{ scale: 0.96 }} onClick={() => { haptic(8); setSel(m) }}
-              initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 + k * 0.05 }}>
-              <div className="om-top">
-                <span className="om-sport">{s.name}</span>
-                <span className="om-lv">{m.levels.map((l) => <LevelPill key={l} id={l} />)}</span>
-              </div>
-              <b>{dayLabel(d)} · {hourLabel(m.start)}</b>
-              <p>{c.name} · {c.area}</p>
-              <div className="om-av">
-                {m.players.map((p) => <Avatar key={p.id} name={p.name} size={30} />)}
-                {Array.from({ length: empty }, (_, i) => <span key={i} className="om-empty" />)}
-              </div>
-              <div className="om-foot"><span>{fa(empty)} جای خالی</span><b>{toman(m.price)}</b></div>
-            </motion.button>
-          )
-        })}
-      </div>
-      <Sheet open={!!sel} onClose={() => setSel(null)} title="پیوستن به بازی">
-        {sel && (
-          <div className="join">
-            <Photo src={clubById(sel.clubId).img} className="td-img" />
-            <h3>{sportById(sel.sport).name} · {clubById(sel.clubId).name}</h3>
-            <p className="muted">{dayLabel(fromKey(sel.date))} {dayMonth(fromKey(sel.date))} · {hourLabel(sel.start)} تا {hourLabel(sel.start + sel.duration)}</p>
-            <div className="join-p">
-              {sel.players.map((p) => (
-                <div key={p.id}><Avatar name={p.name} size={48} /><span>{p.name}</span><LevelPill id={p.level} /><small className="muted">{fa(p.games)} بازی</small></div>
-              ))}
-              <div><Avatar name={user.name} me size={48} /><span>شما</span><LevelPill id={user.level} /></div>
+      <SecHead n={2} title="بازی‌های باز هم‌سطح تو"><span className="live"><i /> زنده</span></SecHead>
+      {sports.length > 1 && <Chips id="feed-sport" small scroll value={sport} onChange={setSport} options={sports.map((id) => ({ id, name: sportById(id).name, color: sportById(id).color }))} />}
+      {list.length ? (
+        <div className="rail">
+          {list.map((g) => (
+            <div key={g.id} className="rail-game">
+              <GameCard g={g} onClick={() => nav.start({ intent: 'match', sport: g.sport, clubId: g.clubId, date: g.date, gameId: g.id })} />
             </div>
-            <Button full variant="lime" onClick={() => join(sel)}>بپیوند · {toman(sel.price)}</Button>
-          </div>
-        )}
-      </Sheet>
+          ))}
+        </div>
+      ) : <p className="muted">فعلاً بازی بازی نیست — خودت یکی بساز!</p>}
     </motion.section>
   )
 }
 
-function WeekendTeaser({ onStart }) {
+function WeekendTeaser({ nav, sport }) {
   const { user } = useStore()
-  const sport = user.sports?.[0] || 'padel'
   const t = tournaments('weekend', sport, user.city)[0]
   if (!t) return null
   const c = clubById(t.clubId)
   return (
     <motion.section variants={rise}>
-      <div className="sec-h"><h3>این آخر هفته</h3></div>
-      <motion.div className="teaser" whileTap={{ scale: 0.98 }} onClick={() => onStart({ sport, activity: 'weekend', format: sportById(sport).formats[0].id })}>
-        <Photo src="./img/ball-space.jpg" />
-        <div className="teaser-shade" />
-        <div className="teaser-txt">
-          <span className="eyebrow">🏆 مسابقه {sportById(sport).name}</span>
+      <SecHead n={4} title="این آخر هفته" />
+      <motion.button className="teaser" whileTap={{ scale: 0.98 }} onClick={() => nav.start({ intent: 'event', sport })} style={{ '--c': sportById(sport).color }}>
+        <span className="teaser-n">{dayMonth(fromKey(t.date))}</span>
+        <div className="grow">
+          <span className="eyebrow">🏆 مسابقه {sportById(sport).name}{t.date === todayKey() ? '، امروز' : ''}</span>
           <h3>{t.title}</h3>
-          <p>{c.name} · {dayMonth(fromKey(t.date))} · {fa(t.cap - t.taken)} جای خالی</p>
+          <p>{c.name}، {fa(t.cap - t.taken)} جای خالی، {toman(t.fee)}</p>
         </div>
         <span className="teaser-go">ثبت‌نام</span>
-      </motion.div>
+      </motion.button>
     </motion.section>
   )
 }
