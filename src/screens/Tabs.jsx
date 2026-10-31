@@ -1,11 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState } from 'react'
-import { BADGES, CITIES, CREDITS, LEVELS, SPORTS, clubById, dayLabel, dayMonth, dayNum, fa, fromKey, hash, hourLabel, levelById, levelOf, range, rankOf, sportById, toman } from '../data'
+import { BADGES, CITIES, CREDITS, LEVELS, SPORTS, clubById, dayLabel, dayMonth, dayNum, fa, fromKey, hash, hourLabel, levelById, levelOf, range, rankOf, short, sportById, toman } from '../data'
 import { askNotifyPermission, chime, haptic } from '../fx'
 import { useStore } from '../store'
 import { Avatar, Button, Chips, CountUp, Empty, Icon, LevelPill, Photo, Sheet, TopBar, rise, stagger } from '../components/ui'
-import { CourtArt } from '../components/Art'
-import { Head } from './Home'
+import { SportGlyph } from './Explore'
 import LevelQuiz from './LevelQuiz'
 
 const KIND = { court: 'رزرو زمین', open: 'بازی باز', join: 'بازی باز', coach: 'کلاس مربی', event: 'مسابقه' }
@@ -22,12 +21,12 @@ export function Matches({ nav }) {
 
   return (
     <div className="page">
-      <h1 className="page-h">بازی‌های من</h1>
+      <h1 className="pg-title">رزروهای من</h1>
       <Chips id="mt" options={[{ id: 'up', name: 'پیش رو' }, { id: 'past', name: 'گذشته' }]} value={tab} onChange={setTab} />
       {!list.length && (
         <>
           <Empty text={tab === 'up' ? 'هنوز رزروی نداری. اولین زمینت رو بگیر!' : 'تاریخچه‌ای نیست.'} />
-          {tab === 'up' && <Button full icon="plus" onClick={() => nav.start({})}>رزرو جدید</Button>}
+          {tab === 'up' && <Button full icon="search" onClick={() => nav.tab('explore')}>پیدا کردن زمین</Button>}
         </>
       )}
       <motion.div className="tline" variants={stagger} initial="hidden" animate="show" key={tab}>
@@ -86,6 +85,7 @@ function BookingCard({ b, onClick }) {
   const empty = b.players?.filter((p) => !p.name).length || 0
   return (
     <motion.button className="bk" whileTap={{ scale: 0.98 }} onClick={onClick} style={{ '--c': s.color }}>
+      <Photo src={c.img} className="bk-img" />
       <div className="bk-body">
         <div className="bk-tags"><span className="sp"><i />{s.name}</span><span>{KIND[b.kind]}</span>{b.series && <span>پکیج</span>}</div>
         <b>{b.title || c.name}</b>
@@ -157,151 +157,149 @@ function ago(t) {
 
 // ---------- پروفایل ----------
 const LADDER = [...LEVELS].reverse()
-const QUIZ_TOP = LADDER.findIndex((l) => l.id === 'B')
 
-export function Profile() {
+export function Profile({ nav }) {
   const { user, xp, wallet, badges, bookings, logout, updateUser, setLevel, topUp, toast } = useStore()
   const rank = rankOf(xp)
   const [quiz, setQuiz] = useState(null)
-  const [credits, setCredits] = useState(false)
+  const [sheet, setSheet] = useState(null)
   const mine = bookings.filter((b) => b.status !== 'cancelled')
   const hours = mine.reduce((s, b) => s + (b.dur || 1), 0)
-  const clubs = new Set(mine.map((b) => b.clubId)).size
   const cityName = CITIES.find((c) => c.id === user.city).name
   const board = Array.from({ length: 9 }, (_, k) => ({ name: ['آرمان ط.', 'سارا ک.', 'کیان م.', 'الناز ر.', 'پویا ن.', 'هستی ص.', 'سینا ج.', 'نیلوفر ا.', 'بردیا ش.'][k], xp: Math.floor(200 + hash('lb' + user.city + k) * 1600) }))
     .concat({ name: user.name, xp, me: true }).sort((a, b) => b.xp - a.xp)
   const myPos = board.findIndex((p) => p.me)
   const sports = user.sports?.length ? user.sports : ['padel']
-  const R = 46, C = 2 * Math.PI * R
+
+  const Row = ({ icon, title, value, onClick, danger }) => (
+    <button className={`menu-row ${danger ? 'danger' : ''}`} onClick={() => { haptic(6); onClick() }}>
+      <Icon name={icon} size={21} /><span className="grow">{title}</span>{value != null && <small>{value}</small>}<Icon name="fwd" size={17} />
+    </button>
+  )
 
   return (
     <div className="page profile">
-      <motion.div className="pcard" initial={{ opacity: 0, rotate: -5, y: 30 }} animate={{ opacity: 1, rotate: -1.5, y: 0 }} transition={{ type: 'spring', stiffness: 140, damping: 16 }}>
-        <CourtArt className="pcard-art" balls={false} bounce={false} />
-        <div className="pc-top"><span dir="ltr">MATCHY PLAYER</span><span>{cityName}</span></div>
-        <div className="pc-id">
-          <div className="pc-ring">
-            <svg viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r={R} className="trk" />
-              <motion.circle cx="50" cy="50" r={R} className="val" strokeDasharray={C} initial={{ strokeDashoffset: C }}
-                animate={{ strokeDashoffset: C * (1 - rank.progress) }} transition={{ delay: 0.3, duration: 1.2 }} />
-            </svg>
-            <Avatar name={user.name} size={66} me />
-          </div>
-          <div className="grow">
-            <h1>{user.name}</h1>
-            <span className="pc-rank">{rank.name}</span>
-            <small>{rank.next ? `${fa(rank.next.xp - xp)} امتیاز تا «${rank.next.name}»` : 'به اوج رسیدی!'}</small>
-          </div>
+      <h1 className="pg-title">پروفایل</h1>
+
+      <motion.div className="pf-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="pf-id">
+          <div className="pf-av"><Avatar name={user.name} size={86} me /><span className="pf-rank">{rank.name}</span></div>
+          <b>{user.name}</b>
+          <small>{cityName}</small>
         </div>
-        <div className="pc-lv">
-          {sports.map((id) => (
-            <button key={id} onClick={() => setQuiz(id)} style={{ '--c': sportById(id).color }}>
-              <small><i />{sportById(id).name}</small><b dir="ltr">{levelOf(user, id)}</b>
-            </button>
-          ))}
+        <div className="pf-stats">
+          <div><b><CountUp to={mine.length} /></b><small>رزرو</small></div>
+          <div><b><CountUp to={hours} /></b><small>ساعت بازی</small></div>
+          <div><b><CountUp to={xp} /></b><small>امتیاز</small></div>
         </div>
       </motion.div>
-
-      <div className="nums">
-        {[{ n: mine.length, t: 'رزرو' }, { n: hours, t: 'ساعت بازی' }, { n: clubs, t: 'باشگاه' }, { n: xp, t: 'امتیاز' }].map((s, k) => (
-          <motion.div key={s.t} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + k * 0.06 }}><b><CountUp to={s.n} /></b><small>{s.t}</small></motion.div>
-        ))}
-      </div>
-
-      <div className="wallet-line">
-        <Icon name="wallet" />
-        <span className="grow">کیف پول <b>{toman(wallet)}</b></span>
-        <button className="link" onClick={() => { topUp(500000); chime('success'); toast({ icon: '💳', title: '۵۰۰ هزار تومان شارژ شد' }) }}>+ شارژ</button>
+      <div className="pf-xp">
+        <i><motion.b initial={{ width: 0 }} animate={{ width: `${rank.progress * 100}%` }} transition={{ delay: 0.2, duration: 1 }} /></i>
+        <small>{rank.next ? `${fa(rank.next.xp - xp)} امتیاز تا «${rank.next.name}»` : 'به اوج رسیدی!'}</small>
       </div>
 
       <section>
-        <Head title="پلکان سطح من"><small className="muted">برای تعیین دوباره بزن</small></Head>
-        <div className="ladders">
+        <h2 className="club-h">سطح من</h2>
+        <div className="pf-levels">
           {sports.map((id) => {
-            const s = sportById(id), cur = LADDER.findIndex((l) => l.id === levelOf(user, id))
+            const s = sportById(id), l = levelOf(user, id), k = LADDER.findIndex((x) => x.id === l)
             return (
-              <button key={id} className="ladder" style={{ '--c': s.color }} onClick={() => setQuiz(id)}>
-                <div className="ld-head"><b>{s.name}</b><span>{LADDER[cur].title}</span><Icon name="edit" size={15} /></div>
-                <div className="ld-steps">
-                  {LADDER.map((l, k) => (
-                    <motion.span key={l.id} className={`${k <= cur ? 'on' : ''} ${k === cur ? 'me' : ''} ${k > QUIZ_TOP ? 'lock' : ''}`}
-                      style={{ height: 16 + k * 7 }} initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ delay: 0.1 + k * 0.04 }}>
-                      <em dir="ltr">{l.id}</em>
-                    </motion.span>
-                  ))}
-                </div>
-              </button>
-            )
-          })}
-          <p className="ld-note"><i /> پله‌های بالاتر از B فقط با نتیجه‌ی مسابقه باز می‌شن.</p>
-        </div>
-      </section>
-
-      <section>
-        <Head title={`جایگاه من در ${cityName}`}><small className="muted">این ماه</small></Head>
-        <div className="podium">
-          {[1, 0, 2].map((k) => (
-            <div key={k} className={`pd-col ${board[k].me ? 'me' : ''}`}>
-              <Avatar name={board[k].name} size={k === 0 ? 52 : 42} me={board[k].me} />
-              <b>{board[k].me ? 'شما' : board[k].name}</b>
-              <small>{fa(board[k].xp)}</small>
-              <motion.span className="pd-block" initial={{ height: 0 }} animate={{ height: [96, 70, 54][k] }}
-                transition={{ delay: 0.2 + k * 0.12, type: 'spring', stiffness: 120, damping: 14 }}>{fa(k + 1)}</motion.span>
-            </div>
-          ))}
-        </div>
-        <div className="ranks">
-          {board.slice(3).map((p, k) => (
-            <div key={p.name} className={`rk-row ${p.me ? 'me' : ''}`}>
-              <span className="rk-n">{fa(k + 4)}</span>
-              <span className="grow">{p.me ? 'شما' : p.name}</span>
-              <b>{fa(p.xp)}</b>
-            </div>
-          ))}
-        </div>
-        {myPos > 0 && <p className="rk-gap">{fa(board[myPos - 1].xp - xp + 1)} امتیاز دیگه تا جایگاه {fa(myPos)} 🔥</p>}
-      </section>
-
-      <section>
-        <Head title="نشان‌ها"><small className="muted">{fa(badges.length)} از {fa(BADGES.length)}</small></Head>
-        <div className="stickers">
-          {BADGES.map((b, k) => {
-            const on = badges.includes(b.id)
-            return (
-              <motion.button key={b.id} className={`sticker ${on ? 'on' : ''}`} style={{ '--r': `${((hash(b.id) - 0.5) * 16).toFixed(1)}deg` }}
-                initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: k * 0.03, type: 'spring', stiffness: 260, damping: 16 }}
-                onClick={() => toast({ icon: on ? b.icon : '🔒', title: b.name, body: b.desc })}>
-                <span>{on ? b.icon : '?'}</span>
-                <small>{b.name}</small>
+              <motion.button key={id} className="pf-lv" whileTap={{ scale: 0.97 }} onClick={() => setQuiz(id)} style={{ '--c': s.color }}>
+                <span className="pf-lv-top"><SportGlyph id={id} />{s.name}</span>
+                <b dir="ltr">{l}</b>
+                <small>{levelById(l).title}</small>
+                <span className="pf-steps">{LADDER.map((x, j) => <i key={x.id} className={j <= k ? 'on' : ''} />)}</span>
+                <em>تعیین دوباره</em>
               </motion.button>
             )
           })}
         </div>
       </section>
 
-      <Head title="تنظیمات" />
-      <div className="settings">
-        <div className="set-row"><span>شهر</span><Chips id="pc" small options={CITIES.map((c) => ({ id: c.id, name: c.name }))} value={user.city} onChange={(city) => updateUser({ city })} /></div>
-        <div className="set-row col"><span>رشته‌های من</span>
-          <Chips id="ps" small options={SPORTS.map((s) => ({ id: s.id, name: s.name, color: s.color }))} value={user.sports || []}
-            onChange={(id) => {
-              const cur = user.sports || []
-              const n = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]
-              if (!n.length) return
-              updateUser({ sports: n })
-              if (!cur.includes(id) && !user.levels?.[id]) setQuiz(id)
-            }} />
-        </div>
-        <button className="set-row" onClick={() => setCredits(true)}><span>منابع تصاویر و نقشه</span><Icon name="fwd" size={18} /></button>
-        <button className="set-row danger" onClick={() => { haptic(20); logout() }}><span>خروج از حساب</span><Icon name="logout" size={18} /></button>
+      <div className="menu">
+        <Row icon="wallet" title="کیف پول" value={toman(wallet)} onClick={() => setSheet('wallet')} />
+        <Row icon="trophy" title={`جایگاه من در ${cityName}`} value={`نفر ${fa(myPos + 1)}`} onClick={() => setSheet('board')} />
+        <Row icon="sparkle" title="نشان‌ها" value={`${fa(badges.length)} از ${fa(BADGES.length)}`} onClick={() => setSheet('badges')} />
+        <Row icon="bell" title="اعلان‌ها" onClick={() => nav.open('notifs')} />
       </div>
+      <div className="menu">
+        <div className="menu-row static"><Icon name="pin" size={21} /><span className="grow">شهر</span>
+          <span className="mini-seg">{CITIES.map((c) => <button key={c.id} className={user.city === c.id ? 'on' : ''} onClick={() => { updateUser({ city: c.id }); nav.setQ({ city: c.id, region: null }) }}>{c.name}</button>)}</span>
+        </div>
+        <Row icon="layers" title="رشته‌های من" value={sports.map((id) => sportById(id).name).join('، ')} onClick={() => setSheet('sports')} />
+        <Row icon="map" title="منابع تصاویر و نقشه" onClick={() => setSheet('credits')} />
+        <Row icon="logout" title="خروج از حساب" danger onClick={() => { haptic(20); logout() }} />
+      </div>
+
+      <Sheet open={sheet === 'wallet'} onClose={() => setSheet(null)} title="کیف پول">
+        <div className="wallet-sheet">
+          <small>موجودی</small>
+          <b><CountUp key={wallet} to={Math.round(wallet / 1000)} format={(v) => fa(v * 1000)} /> <span>تومان</span></b>
+          <div className="ws-amounts">
+            {[200000, 500000, 1000000].map((a) => (
+              <Button key={a} variant="line" onClick={() => { topUp(a); chime('success'); toast({ icon: '💳', title: `${short(a)} تومان شارژ شد` }) }}>+ {short(a)}</Button>
+            ))}
+          </div>
+          <p className="co-mini">در نسخه‌ی نمایشی، پرداخت شبیه‌سازی می‌شه. هزینه‌ی رزروهای لغوشده هم به همین‌جا برمی‌گرده.</p>
+        </div>
+      </Sheet>
+
+      <Sheet open={sheet === 'board'} onClose={() => setSheet(null)} title={`جایگاه ${cityName}، این ماه`}>
+        <div className="podium">
+          {[1, 0, 2].map((k) => (
+            <div key={k} className={`pd-col ${board[k].me ? 'me' : ''}`}>
+              <Avatar name={board[k].name} size={k === 0 ? 50 : 40} me={board[k].me} />
+              <b>{board[k].me ? 'شما' : board[k].name}</b>
+              <small>{fa(board[k].xp)}</small>
+              <motion.span className="pd-block" initial={{ height: 0 }} animate={{ height: [86, 62, 48][k] }} transition={{ delay: 0.15 + k * 0.1, type: 'spring', stiffness: 120, damping: 14 }}>{fa(k + 1)}</motion.span>
+            </div>
+          ))}
+        </div>
+        <div className="ranks">
+          {board.slice(3).map((p, k) => (
+            <div key={p.name} className={`rk-row ${p.me ? 'me' : ''}`}><span className="rk-n">{fa(k + 4)}</span><span className="grow">{p.me ? 'شما' : p.name}</span><b>{fa(p.xp)}</b></div>
+          ))}
+        </div>
+        {myPos > 0 && <p className="co-mini">{fa(board[myPos - 1].xp - xp + 1)} امتیاز دیگه تا نفر {fa(myPos)}. با هر رزرو امتیاز می‌گیری.</p>}
+      </Sheet>
+
+      <Sheet open={sheet === 'badges'} onClose={() => setSheet(null)} title="نشان‌ها">
+        <div className="stickers">
+          {BADGES.map((b) => {
+            const on = badges.includes(b.id)
+            return (
+              <div key={b.id} className={`sticker ${on ? 'on' : ''}`}>
+                <span>{on ? b.icon : '?'}</span>
+                <b>{b.name}</b>
+                <small>{b.desc}</small>
+              </div>
+            )
+          })}
+        </div>
+      </Sheet>
+
+      <Sheet open={sheet === 'sports'} onClose={() => setSheet(null)} title="رشته‌های من">
+        <div className="sp-sports">
+          {SPORTS.map((s) => {
+            const on = sports.includes(s.id)
+            return (
+              <button key={s.id} className={on ? 'on' : ''} onClick={() => {
+                const n = on ? sports.filter((x) => x !== s.id) : [...sports, s.id]
+                if (!n.length) return
+                haptic(6); updateUser({ sports: n })
+                if (!on && !user.levels?.[s.id]) { setSheet(null); setQuiz(s.id) }
+              }}><SportGlyph id={s.id} big /><span>{s.name}</span></button>
+            )
+          })}
+        </div>
+      </Sheet>
+
+      <Sheet open={sheet === 'credits'} onClose={() => setSheet(null)} title="منابع">
+        <ul className="credits" dir="ltr">{CREDITS.map((c) => <li key={c}>{c}</li>)}</ul>
+      </Sheet>
 
       <Sheet open={!!quiz} onClose={() => setQuiz(null)} title={quiz ? `تعیین سطح ${sportById(quiz).name}` : ''}>
         {quiz && <LevelQuiz key={quiz} sport={quiz} onDone={(l) => { setLevel(quiz, l); chime('success'); toast({ icon: '🎯', title: `سطح ${sportById(quiz).name}: ${l}` }); setQuiz(null) }} />}
-      </Sheet>
-      <Sheet open={credits} onClose={() => setCredits(false)} title="منابع">
-        <ul className="credits" dir="ltr">{CREDITS.map((c) => <li key={c}>{c}</li>)}</ul>
       </Sheet>
     </div>
   )

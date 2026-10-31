@@ -1,16 +1,16 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
-import { clubById, dayLabel, fa, hourLabel, levelOf, openMatches, randomPlayer, sportById } from './data'
+import { clubById, dayLabel, fa, hourLabel, levelOf, openMatches, randomPlayer, sportById, todayKey } from './data'
 import { chime, haptic, systemNotify } from './fx'
 import { useStore } from './store'
 import { Icon, Toasts } from './components/ui'
 import { Splash } from './components/Logo'
 import Auth from './screens/Auth'
-import Home from './screens/Home'
 import Explore from './screens/Explore'
 import Club from './screens/Club'
+import Checkout, { Success } from './screens/Checkout'
+import Games from './screens/Games'
 import { Matches, Notifications, Profile } from './screens/Tabs'
-import Wizard from './screens/wizard/Wizard'
 
 export default function App() {
   const { user } = useStore()
@@ -29,70 +29,70 @@ export default function App() {
   )
 }
 
+// ساختار مارکت‌پلیس: «کاوش» (نقشه + فهرست) خانه‌ی اپ است؛ هر چیز دیگری صفحه‌ای است که روی آن باز می‌شود
 const TABS = [
-  { id: 'home', name: 'خانه', icon: 'home' },
-  { id: 'explore', name: 'نقشه', icon: 'map' },
-  { id: 'new', name: '', icon: 'plus' },
-  { id: 'games', name: 'بازی‌ها', icon: 'cal' },
+  { id: 'explore', name: 'کاوش', icon: 'search' },
+  { id: 'games', name: 'هم‌بازی', icon: 'users' },
+  { id: 'trips', name: 'رزروها', icon: 'cal' },
   { id: 'me', name: 'من', icon: 'user' },
 ]
-const PAGES = { club: Club, notifs: Notifications }
+const PAGES = { club: Club, checkout: Checkout, success: Success, notifs: Notifications }
 
 function Main() {
-  const { bookings } = useStore()
-  const [tab, setTab] = useState('home')
-  const [page, setPage] = useState(null)
-  // اپ مستقیم از صفحه‌ی «+» باز می‌شود؛ نوار پایین همیشه دیده می‌شود
-  const [wizard, setWizard] = useState({})
-  const [wzKey, setWzKey] = useState(0)
+  const { user, bookings } = useStore()
+  const [tab, setTab] = useState('explore')
+  const [stack, setStack] = useState([])
+  // جستجوی کاوش بین صفحه‌ها حفظ می‌شود
+  const [q, setQ] = useState(() => ({ city: user.city, region: null, sport: user.sports?.[0] || 'padel', date: todayKey(), part: 'any' }))
   const scrollRef = useRef(null)
   const upcoming = bookings.filter((b) => b.status !== 'cancelled' && b.open).length
   useMatchmaking(setTab)
 
   const top = () => scrollRef.current?.scrollTo({ top: 0 })
   const nav = {
-    tab: (t) => { setPage(null); setWizard(null); haptic(6); setTab(t); top() },
-    open: (name, props = {}) => { haptic(6); setWizard(null); setPage({ name, props }); top() },
-    start: (preset = {}) => { setWizard(preset); setWzKey((k) => k + 1); top() },
+    q, setQ: (p) => setQ((x) => ({ ...x, ...p })),
+    tab: (t) => { setStack([]); haptic(6); setTab(t); top() },
+    open: (name, props = {}) => { haptic(6); setStack((s) => [...s, { name, props, key: Date.now() }]); top() },
+    back: () => { setStack((s) => s.slice(0, -1)); top() },
+    replace: (name, props = {}) => { setStack((s) => [...s.slice(0, -1), { name, props, key: Date.now() }]); top() },
+    done: (t) => { setStack([]); setTab(t); top() },
   }
+  const page = stack[stack.length - 1]
   const Page = page && PAGES[page.name]
-  const view = wizard ? 'wizard' : Page ? 'page' : tab
+  const locked = !Page && tab === 'explore'
 
   return (
     <motion.div className="main" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      <div className={`app-scroll ${view === 'explore' ? 'locked' : ''}`} ref={scrollRef}>
-        <AnimatePresence mode="wait">
-          {wizard ? (
-            <motion.div key={'wz' + wzKey} initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-              <Wizard preset={wizard} nav={nav} onClose={() => setWizard(null)} onDone={(t) => { setWizard(null); setPage(null); setTab(t) }} />
-            </motion.div>
-          ) : Page ? (
-            <motion.div key={'p' + page.name + (page.props.id || '')} initial={{ x: -24, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-              <Page {...page.props} nav={nav} onBack={() => setPage(null)} />
-            </motion.div>
-          ) : (
-            <motion.div key={tab} className={tab === 'explore' ? 'fill' : ''} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-              {tab === 'home' && <Home nav={nav} />}
-              {tab === 'explore' && <Explore nav={nav} />}
-              {tab === 'games' && <Matches nav={nav} />}
-              {tab === 'me' && <Profile nav={nav} />}
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* کاوش همیشه زنده می‌ماند تا نقشه با هر رفت‌وبرگشت از نو ساخته نشود */}
+      <div className={`explore-layer ${tab === 'explore' && !Page ? '' : 'off'}`} aria-hidden={tab !== 'explore' || !!Page}>
+        <Explore nav={nav} active={tab === 'explore' && !Page} />
       </div>
+      {(Page || tab !== 'explore') && (
+        <div className={`app-scroll ${locked ? 'locked' : ''}`} ref={scrollRef}>
+          <AnimatePresence mode="wait">
+            {Page ? (
+              <motion.div key={page.key} initial={{ x: -28, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: [0.2, 0.7, 0.2, 1] }}>
+                <Page {...page.props} nav={nav} onBack={nav.back} />
+              </motion.div>
+            ) : (
+              <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+                {tab === 'games' && <Games nav={nav} />}
+                {tab === 'trips' && <Matches nav={nav} />}
+                {tab === 'me' && <Profile nav={nav} />}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
       <nav className="nav">
-        {TABS.map((t) => t.id === 'new' ? (
-          <motion.button key={t.id} className={`fab ${wizard ? 'on' : ''}`} whileTap={{ scale: 0.85, rotate: 90 }} onClick={() => nav.start({})} aria-label="رزرو جدید">
-            <Icon name="plus" size={26} stroke={2.6} />
-          </motion.button>
-        ) : (
-          <button key={t.id} className={`nav-i ${view === t.id ? 'on' : ''}`} onClick={() => nav.tab(t.id)}>
+        {TABS.map((t) => (
+          <button key={t.id} className={`nav-i ${tab === t.id ? 'on' : ''}`} onClick={() => nav.tab(t.id)}>
             <span className="nav-ic">
-              {view === t.id && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: 'spring', stiffness: 500, damping: 35 }} />}
-              <Icon name={t.icon} size={21} />
-              {t.id === 'games' && upcoming > 0 && <i className="nav-dot" />}
+              <Icon name={t.icon} size={22} stroke={tab === t.id ? 2.4 : 1.8} />
+              {t.id === 'trips' && upcoming > 0 && <i className="nav-dot" />}
             </span>
             <small>{t.name}</small>
+            {tab === t.id && <motion.span layoutId="nav-line" className="nav-line" transition={{ type: 'spring', stiffness: 500, damping: 35 }} />}
           </button>
         ))}
       </nav>
@@ -138,7 +138,7 @@ function useMatchmaking(setTab) {
       notify({ icon: '📣', title: 'بازی هم‌سطح تو پیدا شد', body })
       chime('alarm'); haptic([40, 30, 40])
       systemNotify('matchy، بازی هم‌سطح', body)
-      toast({ icon: '📣', title: 'بازی هم‌سطح تو پیدا شد', body: `${s.name}، ${club.name}`, duration: 5500, action: { label: 'ببین', run: () => setTab('home') } })
+      toast({ icon: '📣', title: 'بازی هم‌سطح تو پیدا شد', body: `${s.name}، ${club.name}`, duration: 5500, action: { label: 'ببین', run: () => setTab('games') } })
     }, 15000)
     return () => clearTimeout(t)
   }, [])
