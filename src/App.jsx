@@ -9,7 +9,6 @@ import Auth from './screens/Auth'
 import Explore from './screens/Explore'
 import Club from './screens/Club'
 import Checkout, { Success } from './screens/Checkout'
-import Games from './screens/Games'
 import { Matches, Notifications, Profile } from './screens/Tabs'
 
 export default function App() {
@@ -29,18 +28,20 @@ export default function App() {
   )
 }
 
-// ساختار مارکت‌پلیس: «کاوش» (نقشه + فهرست) خانه‌ی اپ است؛ هر چیز دیگری صفحه‌ای است که روی آن باز می‌شود
+// همه‌چیز از نقشه شروع می‌شود: سه تب اول حالت‌های مختلف همان نقشه‌اند؛ بقیه صفحه‌هایی روی آن
 const TABS = [
-  { id: 'explore', name: 'کاوش', icon: 'search' },
-  { id: 'games', name: 'هم‌بازی', icon: 'users' },
+  { id: 'court', name: 'زمین', icon: 'map', map: true },
+  { id: 'games', name: 'هم‌بازی', icon: 'users', map: true },
+  { id: 'coach', name: 'مربی', icon: 'coach', map: true },
   { id: 'trips', name: 'رزروها', icon: 'cal' },
   { id: 'me', name: 'من', icon: 'user' },
 ]
+const isMap = (t) => TABS.find((x) => x.id === t)?.map
 const PAGES = { club: Club, checkout: Checkout, success: Success, notifs: Notifications }
 
 function Main() {
   const { user, bookings } = useStore()
-  const [tab, setTab] = useState('explore')
+  const [tab, setTab] = useState('court')
   const [stack, setStack] = useState([])
   // جستجوی کاوش بین صفحه‌ها حفظ می‌شود
   const [q, setQ] = useState(() => ({ city: user.city, region: null, sport: user.sports?.[0] || 'padel', date: todayKey(), part: 'any' }))
@@ -59,16 +60,16 @@ function Main() {
   }
   const page = stack[stack.length - 1]
   const Page = page && PAGES[page.name]
-  const locked = !Page && tab === 'explore'
+  const onMap = isMap(tab)
 
   return (
     <motion.div className="main" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       {/* کاوش همیشه زنده می‌ماند تا نقشه با هر رفت‌وبرگشت از نو ساخته نشود */}
-      <div className={`explore-layer ${tab === 'explore' && !Page ? '' : 'off'}`} aria-hidden={tab !== 'explore' || !!Page}>
-        <Explore nav={nav} active={tab === 'explore' && !Page} />
+      <div className={`explore-layer ${onMap && !Page ? '' : 'off'}`} aria-hidden={!onMap || !!Page}>
+        <Explore nav={nav} mode={onMap ? tab : 'court'} active={onMap && !Page} />
       </div>
-      {(Page || tab !== 'explore') && (
-        <div className={`app-scroll ${locked ? 'locked' : ''}`} ref={scrollRef}>
+      {(Page || !onMap) && (
+        <div className="app-scroll" ref={scrollRef}>
           <AnimatePresence mode="wait">
             {Page ? (
               <motion.div key={page.key} initial={{ x: -28, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: [0.2, 0.7, 0.2, 1] }}>
@@ -76,7 +77,6 @@ function Main() {
               </motion.div>
             ) : (
               <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-                {tab === 'games' && <Games nav={nav} />}
                 {tab === 'trips' && <Matches nav={nav} />}
                 {tab === 'me' && <Profile nav={nav} />}
               </motion.div>

@@ -3,32 +3,58 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { CITIES, DAYPARTS, REGIONS, SPORTS, cityById, clubsIn, dayKey, dayLabel, dayNum, fa, fromKey, hourLabel, nextDays, regionById, short, sportById } from '../data'
+import {
+  CITIES, DAYPARTS, REGIONS, SPORTS, cityById, clubById, clubsIn, coachesAt, dayKey, dayLabel, dayNum, fa, fromKey, hourLabel, levelOf, nextDays,
+  openMatches, priceFor, range, regionById, short, sportById, toman, tournaments, weekday,
+} from '../data'
 import { haptic } from '../fx'
 import { freeHours, useStore } from '../store'
-import { Icon, Photo } from '../components/ui'
+import { Avatar, Button, Icon, LevelPill, Photo } from '../components/ui'
+import { BookBox } from './Club'
 
 const TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 const TOP = 128 // فاصله‌ی پنل باز از بالا (زیر نوار جستجو)
-const PEEK = 190 // ارتفاع پنل جمع‌شده (با احتساب نوار پایین)
+const PEEK = 178 // ارتفاع پنل جمع‌شده (با احتساب نوار پایین)
 const SPRING = { type: 'spring', stiffness: 380, damping: 38 }
+const MODE = {
+  court: { title: (n) => `${fa(n)} باشگاه ساعت آزاد دارن`, empty: 'ساعت آزادی پیدا نشد' },
+  games: { title: (n) => `${fa(n)} بازی باز دنبال یارن`, empty: 'بازی بازی پیدا نشد' },
+  coach: { title: (n) => `${fa(n)} مربی در دسترس`, empty: 'مربی‌ای پیدا نشد' },
+}
 
-// کاوش: نقشه‌ی تمام‌صفحه + پنل کشویی فهرست باشگاه‌ها + جستجو
-export default function Explore({ nav, active }) {
-  const { bookings, notifications } = useStore()
+// همه‌چیز از نقشه شروع می‌شود: سه حالت زمین / هم‌بازی / مربی روی یک نقشه و یک پنل کشویی
+export default function Explore({ nav, mode, active }) {
+  const { user, bookings, joined, notifications } = useStore()
   const { q, setQ } = nav
   const [sel, setSel] = useState(null)
   const [search, setSearch] = useState(false)
   const part = DAYPARTS.find((d) => d.id === q.part)
   const sport = sportById(q.sport)
+  const lv = levelOf(user, q.sport)
   const unread = notifications.filter((n) => !n.read).length
+  const clubs = useMemo(() => clubsIn(q.city, q.sport, q.region), [q.city, q.sport, q.region])
 
-  const list = useMemo(() => clubsIn(q.city, q.sport, q.region)
-    .map((c) => ({ c, hours: freeHours(bookings, c, q.sport, q.date, part.from, part.to) }))
-    .sort((a, b) => (b.hours.length > 0) - (a.hours.length > 0) || b.c.rating - a.c.rating), [q, bookings])
-  const open = list.filter((x) => x.hours.length).length
+  // داده‌ی هر حالت: فهرست پنل + عدد روی پین هر باشگاه
+  const data = useMemo(() => {
+    if (mode === 'games') {
+      // بازی‌ها از روز انتخابی تا چند روز بعد، تا فهرست هیچ‌وقت خالی نماند
+      const games = openMatches({ city: q.city, sport: q.sport, level: lv })
+        .filter((g) => !joined.includes(g.id) && fromKey(g.date) >= fromKey(q.date) && (!q.region || clubById(g.clubId).region === q.region) && g.start >= part.from && g.start < part.to)
+        .sort((a, b) => fromKey(a.date) - fromKey(b.date) || a.gap - b.gap || a.start - b.start)
+      return { items: games, pin: (c) => { const n = games.filter((g) => g.clubId === c.id).length; return n ? { label: `${fa(n)} بازی`, hot: true } : null } }
+    }
+    if (mode === 'coach') {
+      const seen = new Set(), items = []
+      clubs.forEach((c) => coachesAt(c, q.sport).forEach((m) => { if (!seen.has(m.id)) { seen.add(m.id); items.push({ m, c }) } }))
+      return { items, pin: (c) => { const n = coachesAt(c, q.sport).length; return n ? { label: `${fa(n)} مربی`, hot: true } : null } }
+    }
+    const items = clubs.map((c) => ({ c, hours: freeHours(bookings, c, q.sport, q.date, part.from, part.to) }))
+      .sort((a, b) => (b.hours.length > 0) - (a.hours.length > 0) || b.c.rating - a.c.rating)
+    return { items, count: items.filter((x) => x.hours.length).length, pin: (c) => { const x = items.find((i) => i.c.id === c.id); return { label: short(c.price[q.sport]), hot: !!x?.hours.length } } }
+  }, [mode, clubs, q, bookings, joined, lv])
+  const count = data.count ?? data.items.length
 
-  // ---------- پنل کشویی با سه حالت: باز، نیمه، جمع ----------
+  // ---------- پنل کشویی با سه حالت ----------
   const box = useRef(null)
   const [H, setH] = useState(720)
   useLayoutEffect(() => {
@@ -36,7 +62,7 @@ export default function Explore({ nav, active }) {
     ro.observe(box.current)
     return () => ro.disconnect()
   }, [])
-  const snapsOf = (h) => ({ full: TOP, half: Math.round(h * 0.47), peek: h - PEEK })
+  const snapsOf = (h) => ({ full: TOP, half: Math.round(h * 0.5), peek: h - PEEK })
   const snaps = snapsOf(H)
   const [snap, setSnap] = useState('half')
   const y = useMotionValue(snaps.half)
@@ -54,6 +80,8 @@ export default function Explore({ nav, active }) {
   // ---------- نقشه ----------
   const el = useRef(null), map = useRef(null), pins = useRef(null), goRef = useRef(go)
   goRef.current = go
+  const pick = (id) => { haptic(8); setSel(id); goRef.current('half') }
+  const pickRef = useRef(pick); pickRef.current = pick
   useEffect(() => {
     const m = L.map(el.current, { zoomControl: false, attributionControl: false, zoomSnap: 0.5 }).setView(cityById(q.city).center, cityById(q.city).zoom)
     // اعتبار نقشه بالای صفحه، چون پایین زیر پنل می‌رود
@@ -61,35 +89,47 @@ export default function Explore({ nav, active }) {
     L.tileLayer(TILES, { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m)
     pins.current = L.layerGroup().addTo(m)
     m.on('dragstart', () => goRef.current('peek'))
-    m.on('click', () => setSel(null))
     map.current = m
     const t = setTimeout(() => m.invalidateSize(), 260)
     return () => { clearTimeout(t); m.remove(); map.current = null }
   }, [])
   useEffect(() => { if (active) setTimeout(() => map.current?.invalidateSize(), 60) }, [active])
+  useEffect(() => { setSel(null) }, [mode, q.sport, q.city])
 
-  // پین قیمت مثل آگهی‌ها؛ باشگاه بدون ساعت آزاد کم‌رنگ
   useEffect(() => {
     const g = pins.current; if (!g) return
     g.clearLayers()
-    list.forEach(({ c, hours }) => {
+    clubs.forEach((c) => {
+      const p = data.pin(c)
       const on = sel === c.id
-      const icon = L.divIcon({ className: 'pin-wrap', iconSize: [0, 0], html: `<div class="ppin ${on ? 'on' : ''} ${hours.length ? '' : 'full'}">${short(c.price[q.sport])}</div>` })
-      L.marker(c.at, { icon, zIndexOffset: on ? 1000 : hours.length ? 100 : 0 })
-        .on('click', (e) => { L.DomEvent.stopPropagation(e); haptic(8); setSel(c.id); goRef.current('peek') }).addTo(g)
+      const html = p ? `<div class="ppin ${on ? 'on' : ''} ${p.hot ? '' : 'full'} m-${mode}">${p.label}</div>` : `<div class="pdot ${on ? 'on' : ''}"></div>`
+      L.marker(c.at, { icon: L.divIcon({ className: 'pin-wrap', iconSize: [0, 0], html }), zIndexOffset: on ? 1000 : p?.hot ? 100 : 0 })
+        .on('click', (e) => { L.DomEvent.stopPropagation(e); pickRef.current(c.id) }).addTo(g)
     })
-  }, [list, sel])
+  }, [clubs, data, sel, mode])
 
-  useEffect(() => {
+  // دوربین روی باشگاه‌ها، در بخشی از نقشه که زیر پنل نیست
+  const frame = (animate = true) => {
     const m = map.current; if (!m) return
-    const r = q.region && regionById(q.region)
-    if (r) m.flyToBounds(L.latLng(r.center).toBounds(r.r * 2.4), { duration: 0.7 })
-    else m.flyTo(cityById(q.city).center, cityById(q.city).zoom, { duration: 0.7 })
-  }, [q.city, q.region])
-  useEffect(() => { const c = list.find((x) => x.c.id === sel); if (c) map.current?.panTo(c.c.at, { animate: true }) }, [sel])
+    const h = box.current?.clientHeight || H
+    const pts = clubsIn(q.city, null, q.region).map((c) => c.at)
+    if (!pts.length) return
+    const opts = { paddingTopLeft: [40, 150], paddingBottomRight: [40, Math.round(h * 0.5) + 30], maxZoom: 14 }
+    animate ? m.flyToBounds(L.latLngBounds(pts), { ...opts, duration: 0.7 }) : m.fitBounds(L.latLngBounds(pts), opts)
+  }
+  useEffect(() => { frame(true) }, [q.city, q.region])
+  useEffect(() => { const t = setTimeout(() => frame(false), 300); return () => clearTimeout(t) }, [])
+  useEffect(() => {
+    const m = map.current, c = sel && clubById(sel)
+    if (!m || !c) return
+    // باشگاه انتخاب‌شده بالای پنل نیمه‌باز قرار می‌گیرد
+    const h = box.current?.clientHeight || H
+    m.panTo(m.unproject(m.project(c.at).add([0, h * 0.2])), { animate: true })
+  }, [sel])
 
-  const picked = list.find((x) => x.c.id === sel)
   const where = q.region ? regionById(q.region).name : cityById(q.city).name
+  const selClub = sel && clubById(sel)
+  const events = mode === 'games' ? [...tournaments('weekend', q.sport, q.city), ...tournaments('official', q.sport, q.city)].sort((a, b) => fromKey(a.date) - fromKey(b.date)).slice(0, 4) : []
 
   return (
     <div className="explore" ref={box}>
@@ -100,7 +140,7 @@ export default function Explore({ nav, active }) {
           <motion.button className="search-cap" whileTap={{ scale: 0.98 }} onClick={() => { haptic(8); setSearch(true) }}>
             <Icon name="search" size={20} stroke={2.4} />
             <span className="grow">
-              <b>{sport.name} در {where}</b>
+              <b>{sport.name}، {where}</b>
               <small>{dayLabel(q.date)} {dayNum(fromKey(q.date))}، {part.name}</small>
             </span>
             <span className="cap-filter"><Icon name="layers" size={18} /></span>
@@ -112,21 +152,12 @@ export default function Explore({ nav, active }) {
         </div>
         <div className="sport-bar">
           {SPORTS.map((s) => (
-            <button key={s.id} className={q.sport === s.id ? 'on' : ''} onClick={() => { haptic(6); setSel(null); setQ({ sport: s.id }) }}>
+            <button key={s.id} className={q.sport === s.id ? 'on' : ''} onClick={() => { haptic(6); setQ({ sport: s.id }) }}>
               <SportGlyph id={s.id} /><span>{s.name}</span>
             </button>
           ))}
         </div>
       </div>
-
-      <AnimatePresence>
-        {picked && snap === 'peek' && (
-          <motion.div className="pick-card" initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }}>
-            <Listing x={picked} q={q} nav={nav} compact />
-            <button className="pick-x" onClick={() => setSel(null)} aria-label="بستن"><Icon name="close" size={16} /></button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <motion.div className="ex-sheet" style={{ y }}>
         <motion.div className="ex-grip" style={{ touchAction: 'none' }}
@@ -135,16 +166,42 @@ export default function Explore({ nav, active }) {
           onPanEnd={panEnd}
           onTap={() => go(snap === 'full' ? 'half' : 'full')}>
           <i />
-          <b>{open ? <>{fa(open)} باشگاه ساعت آزاد دارن</> : 'ساعت آزادی پیدا نشد'}</b>
-          <small>{fa(list.length)} باشگاه {sport.name} در {where}، {dayLabel(q.date)}</small>
+          {selClub ? (
+            <b className="grip-club">{selClub.name}</b>
+          ) : (
+            <>
+              <b>{count ? MODE[mode].title(count) : MODE[mode].empty}</b>
+              <small>{sport.name} در {where}، {mode === 'games' ? `از ${dayLabel(q.date)}` : dayLabel(q.date)}، {part.name}</small>
+            </>
+          )}
         </motion.div>
-        <div className="ex-list" style={{ height: Math.max(0, H - snaps[snap] - 74) }}>
-          {list.map((x, k) => (
-            <motion.div key={x.c.id + q.sport} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(k, 6) * 0.04 }}>
-              <Listing x={x} q={q} nav={nav} />
-            </motion.div>
-          ))}
-          {!list.length && <p className="ex-empty">در {where} باشگاه {sport.name} نداریم. ناحیه یا رشته‌ی دیگه رو امتحان کن.</p>}
+        <div className="ex-list" style={{ height: Math.max(0, H - snaps[snap] - 70) }}>
+          <AnimatePresence mode="wait" initial={false}>
+            {selClub ? (
+              <motion.div key={'c' + sel} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.18 }}>
+                <ClubPanel c={selClub} mode={mode} q={q} nav={nav} onClose={() => setSel(null)} />
+              </motion.div>
+            ) : (
+              <motion.div key={'l' + mode} className="ex-rows" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                {mode === 'court' && data.items.map((x) => <ClubRow key={x.c.id} x={x} q={q} nav={nav} onOpen={() => pick(x.c.id)} />)}
+                {mode === 'games' && data.items.map((g) => <GameLine key={g.id} g={g} nav={nav} />)}
+                {mode === 'coach' && data.items.map(({ m, c }) => <CoachLine key={m.id} m={m} c={c} q={q} nav={nav} />)}
+                {!data.items.length && <p className="ex-empty">{MODE[mode].empty}. روز، ساعت یا ناحیه‌ی دیگه رو از جستجو امتحان کن.</p>}
+                {events.length > 0 && (
+                  <div className="ex-events">
+                    <h3>مسابقه‌های پیش رو</h3>
+                    {events.map((e) => (
+                      <button key={e.id} className="ev-line" onClick={() => nav.open('checkout', { kind: 'event', eventId: e.id, sport: q.sport, clubId: e.clubId, date: e.date })}>
+                        <span className="ce-d"><b>{dayNum(fromKey(e.date))}</b><small>{weekday(fromKey(e.date))}</small></span>
+                        <span className="grow"><b>{e.title}</b><small>{clubById(e.clubId).name}، {hourLabel(e.start)}، {fa(e.cap - e.taken)} جا</small></span>
+                        <em>{short(e.fee)}</em>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
 
@@ -161,32 +218,105 @@ export default function Explore({ nav, active }) {
   )
 }
 
-// کارت آگهی باشگاه: عکس بزرگ، امتیاز، ساعت‌های آزاد که مستقیم به پرداخت می‌روند
-export function Listing({ x, q, nav, compact }) {
+// ردیف باشگاه در حالت زمین: عکس کوچک، اطلاعات، ساعت‌های آزاد
+function ClubRow({ x, q, nav, onOpen }) {
   const { c, hours } = x
-  const s = sportById(q.sport)
-  const n = compact ? 4 : 6
-  const openClub = () => nav.open('club', { id: c.id, sport: q.sport, date: q.date })
   return (
-    <div className={`lst ${compact ? 'compact' : ''}`}>
-      <motion.div className="lst-photo" whileTap={{ scale: 0.98 }} onClick={openClub}>
-        <Photo src={c.img} />
-        <span className="lst-tag">{c.indoor ? 'سرپوشیده' : 'روباز'}</span>
-        {!hours.length && <span className="lst-full">این بازه پره</span>}
-      </motion.div>
-      <div className="lst-info" onClick={openClub}>
-        <div className="lst-row"><b>{c.name}</b><span><Icon name="star" size={13} fill="currentColor" /> {fa(c.rating)}</span></div>
-        <small>{c.area}، {fa(c.courts[q.sport])} زمین {s.name}</small>
-        <p><b>{short(c.price[q.sport])}</b> تومان، هر ساعت</p>
-      </div>
-      {hours.length > 0 && (
-        <div className="lst-slots">
-          {hours.slice(0, n).map((h) => (
-            <motion.button key={h} whileTap={{ scale: 0.92 }} onClick={() => nav.open('checkout', { kind: 'court', clubId: c.id, sport: q.sport, date: q.date, start: h, dur: 1 })}>
-              {hourLabel(h)}
-            </motion.button>
+    <div className={`crow ${hours.length ? '' : 'full'}`}>
+      <button className="crow-main" onClick={onOpen}>
+        <Photo src={c.img} className="crow-img" />
+        <span className="grow">
+          <b>{c.name}</b>
+          <small>{c.area}، <Icon name="star" size={11} fill="currentColor" /> {fa(c.rating)}</small>
+          <small><b>{short(c.price[q.sport])}</b> هر ساعت</small>
+        </span>
+        <Icon name="fwd" size={18} />
+      </button>
+      {hours.length > 0 ? (
+        <div className="crow-slots">
+          {hours.slice(0, 6).map((h) => (
+            <motion.button key={h} whileTap={{ scale: 0.92 }} onClick={() => nav.open('checkout', { kind: 'court', clubId: c.id, sport: q.sport, date: q.date, start: h, dur: 1 })}>{hourLabel(h)}</motion.button>
           ))}
-          {hours.length > n && <button className="more" onClick={openClub}>+{fa(hours.length - n)}</button>}
+          {hours.length > 6 && <button className="more" onClick={onOpen}>+{fa(hours.length - 6)}</button>}
+        </div>
+      ) : <small className="crow-none">در این بازه پره</small>}
+    </div>
+  )
+}
+
+function GameLine({ g, nav }) {
+  const c = clubById(g.clubId)
+  return (
+    <motion.button className="gline" whileTap={{ scale: 0.98 }} onClick={() => nav.open('checkout', { kind: 'join', gameId: g.id, sport: g.sport, clubId: g.clubId, date: g.date })}>
+      <span className="gl-t"><b>{hourLabel(g.start)}</b><small>{dayLabel(g.date)}</small></span>
+      <span className="grow">
+        <b>{c.name}</b>
+        <span className="gl-meta">{g.levels.map((l) => <LevelPill key={l} id={l} />)}{g.gap === 0 && <em>هم‌سطح تو</em>}</span>
+      </span>
+      <span className="gl-r">
+        <span className="cg-seats">{Array.from({ length: g.total }, (_, k) => <i key={k} className={k < g.players.length ? 'on' : ''} />)}</span>
+        <small>{short(g.share)}</small>
+      </span>
+    </motion.button>
+  )
+}
+
+function CoachLine({ m, c, q, nav }) {
+  return (
+    <motion.button className="cline" whileTap={{ scale: 0.98 }} onClick={() => nav.open('checkout', { kind: 'coach', coachId: m.id, sport: q.sport, clubId: c.id, date: q.date })}>
+      <Avatar name={m.name} size={48} />
+      <span className="grow">
+        <b>{m.name} <LevelPill id={m.level} /></b>
+        <small>{c.name}، {fa(m.exp)} سال سابقه، ★ {fa(m.rating)}</small>
+      </span>
+      <span className="cl-p"><b>{short(m.price)}</b><small>هر جلسه</small></span>
+    </motion.button>
+  )
+}
+
+// پنل باشگاه داخل پنل نقشه: رزرو همین‌جا، بدون رفتن به صفحه‌ی دیگر
+function ClubPanel({ c, mode, q, nav, onClose }) {
+  const { user } = useStore()
+  const sid = c.courts[q.sport] ? q.sport : Object.keys(c.courts)[0]
+  const [v, setV] = useState({ date: q.date, dur: 1, start: null })
+  const set = (p) => setV((x) => ({ ...x, ...p }))
+  const games = openMatches({ city: c.city, sport: sid, level: levelOf(user, sid), clubId: c.id })
+  const coaches = coachesAt(c, sid)
+  const total = v.start != null ? priceFor(c, sid, v.date, v.start, v.dur) : 0
+  return (
+    <div className="cpanel">
+      <div className="cp-head">
+        <Photo src={c.img} className="cp-img" />
+        <div className="grow">
+          <small><Icon name="star" size={12} fill="currentColor" /> {fa(c.rating)} ({fa(c.reviews)})، {c.area}</small>
+          <span className="cp-tags"><span>{c.indoor ? 'سرپوشیده' : 'روباز'}</span><span>{fa(c.courts[sid])} زمین</span><span>{short(c.price[sid])}/ساعت</span></span>
+        </div>
+        <button className="pick-x" onClick={onClose} aria-label="بستن"><Icon name="close" size={16} /></button>
+      </div>
+      <div className="cp-links">
+        <button className="link" onClick={() => nav.open('club', { id: c.id, sport: sid, date: v.date })}>صفحه‌ی کامل باشگاه</button>
+        <span>،</span>
+        <button className="link" onClick={onClose}>همه‌ی باشگاه‌ها</button>
+      </div>
+
+      {mode === 'court' && (
+        <>
+          <BookBox c={c} sport={sid} v={v} set={set} title={null} />
+          <Button full variant="lime" disabled={v.start == null} onClick={() => nav.open('checkout', { kind: 'court', clubId: c.id, sport: sid, date: v.date, start: v.start, dur: v.dur })}>
+            {v.start == null ? 'یک ساعت انتخاب کن' : `رزرو ${range(v.start, v.dur)}، ${toman(total)}`}
+          </Button>
+        </>
+      )}
+      {mode === 'games' && (
+        <div className="ex-rows">
+          {games.map((g) => <GameLine key={g.id} g={g} nav={nav} />)}
+          {!games.length && <p className="ex-empty">فعلاً بازی بازی اینجا نیست.</p>}
+        </div>
+      )}
+      {mode === 'coach' && (
+        <div className="ex-rows">
+          {coaches.map((m) => <CoachLine key={m.id} m={m} c={c} q={{ ...q, sport: sid }} nav={nav} />)}
+          {!coaches.length && <p className="ex-empty">این باشگاه مربی {sportById(sid).name} نداره.</p>}
         </div>
       )}
     </div>
@@ -207,7 +337,7 @@ function SearchPanel({ open, q, onClose, onApply }) {
         <motion.div className="search-panel" initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.22 }}>
           <div className="sp-head">
             <button className="icon-btn" onClick={onClose} aria-label="بستن"><Icon name="close" /></button>
-            <b>جستجوی زمین</b>
+            <b>جستجو</b>
             <span style={{ width: 40 }} />
           </div>
           <div className="sp-body">
@@ -248,7 +378,7 @@ function SearchPanel({ open, q, onClose, onApply }) {
           </div>
           <div className="sp-foot">
             <button className="link" onClick={() => setD({ ...q, region: null, part: 'any', date: dayKey(new Date()) })}>پاک کردن</button>
-            <motion.button className="sp-go" whileTap={{ scale: 0.96 }} onClick={() => onApply(d)}><Icon name="search" size={18} stroke={2.6} /> نمایش باشگاه‌ها</motion.button>
+            <motion.button className="sp-go" whileTap={{ scale: 0.96 }} onClick={() => onApply(d)}><Icon name="search" size={18} stroke={2.6} /> نمایش روی نقشه</motion.button>
           </div>
         </motion.div>
       )}

@@ -11,28 +11,14 @@ export default function Club({ id, sport: pre, date: preDate, nav, onBack }) {
   const c = clubById(id)
   const sports = clubSports(c)
   const [sport, setSport] = useState(pre && c.courts[pre] ? pre : (sports.find((s) => user.sports?.includes(s.id)) || sports[0]).id)
-  const [date, setDate] = useState(preDate || todayKey())
-  const [dur, setDur] = useState(1)
-  const [start, setStart] = useState(null)
+  const [v, setV] = useState({ date: preDate || todayKey(), dur: 1, start: null })
+  const { date, dur, start } = v
+  const set = (p) => setV((x) => ({ ...x, ...p }))
   const s = sportById(sport)
-  const days = useMemo(() => nextDays(14), [])
-
-  const now = new Date()
-  const slots = useMemo(() => {
-    const out = []
-    for (let h = 7; h + dur <= 24; h++) {
-      const past = date === todayKey() && h <= now.getHours()
-      const free = !past && courtsOf(c, sport).filter((ct) => isFree(bookings, c, sport, ct.id, date, h, dur)).length
-      out.push({ h, past, free })
-    }
-    return out
-  }, [bookings, sport, date, dur])
-  const freeCount = slots.filter((x) => x.free).length
   const games = openMatches({ city: c.city, sport, level: levelOf(user, sport), clubId: c.id }).slice(0, 4)
   const coaches = coachesAt(c, sport)
   const events = [...tournaments('weekend', sport, c.city, c.id), ...tournaments('official', sport, c.city, c.id)].sort((a, b) => fromKey(a.date) - fromKey(b.date)).slice(0, 3)
   const total = start != null ? priceFor(c, sport, date, start, dur) : 0
-  const pick = (p) => { haptic(6); setStart(null); p() }
 
   return (
     <motion.div className="club" variants={stagger} initial="hidden" animate="show">
@@ -61,39 +47,12 @@ export default function Club({ id, sport: pre, date: preDate, nav, onBack }) {
         {sports.length > 1 && (
           <motion.div variants={rise} className="club-sports">
             {sports.map((x) => (
-              <button key={x.id} className={sport === x.id ? 'on' : ''} style={{ '--c': x.color }} onClick={() => pick(() => setSport(x.id))}><i />{x.name}</button>
+              <button key={x.id} className={sport === x.id ? 'on' : ''} style={{ '--c': x.color }} onClick={() => { haptic(6); set({ start: null }); setSport(x.id) }}><i />{x.name}</button>
             ))}
           </motion.div>
         )}
 
-        <motion.section variants={rise} className="book-box">
-          <h2>کِی بازی می‌کنی؟</h2>
-          <div className="bx-days">
-            {days.map((d) => {
-              const k = dayKey(d)
-              return (
-                <button key={k} className={date === k ? 'on' : ''} onClick={() => pick(() => setDate(k))}>
-                  <small>{dayLabel(d)}</small><b>{dayNum(d)}</b>
-                </button>
-              )
-            })}
-          </div>
-          <div className="bx-dur">
-            <span>مدت</span>
-            {[1, 2, 3].map((n) => <button key={n} className={dur === n ? 'on' : ''} onClick={() => pick(() => setDur(n))}>{fa(n)} ساعت</button>)}
-          </div>
-          <div className="bx-hours">
-            {slots.map(({ h, past, free }) => (
-              <motion.button key={h} whileTap={free ? { scale: 0.92 } : {}} disabled={!free}
-                className={`${start === h ? 'on' : ''} ${isPeak(date, h) ? 'peak' : ''} ${past ? 'past' : ''}`}
-                onClick={() => { haptic(8); setStart(start === h ? null : h) }}>
-                <b>{hourLabel(h)}</b>
-                <small>{free ? short(priceFor(c, sport, date, h, 1)) : past ? 'گذشته' : 'پر'}</small>
-              </motion.button>
-            ))}
-          </div>
-          <p className="bx-note">{freeCount ? <>{fa(freeCount)} ساعت شروع آزاد، {dayLabel(date)} {weekday(fromKey(date))}. ساعت‌های خط‌دار پیک‌اند.</> : 'این روز پره؛ روز دیگه‌ای رو ببین.'}</p>
-        </motion.section>
+        <motion.section variants={rise}><BookBox c={c} sport={sport} v={v} set={set} /></motion.section>
 
         {games.length > 0 && (
           <motion.section variants={rise}>
@@ -159,5 +118,53 @@ export default function Club({ id, sport: pre, date: preDate, nav, onBack }) {
         </div>
       </CtaBar>
     </motion.div>
+  )
+}
+
+// انتخاب روز، مدت و ساعت شروع — هم در صفحه‌ی باشگاه و هم در پنل نقشه
+export function BookBox({ c, sport, v, set, title = 'کِی بازی می‌کنی؟' }) {
+  const { bookings } = useStore()
+  const { date, dur, start } = v
+  const days = useMemo(() => nextDays(14), [])
+  const slots = useMemo(() => {
+    const now = new Date(), out = []
+    for (let h = 7; h + dur <= 24; h++) {
+      const past = date === todayKey() && h <= now.getHours()
+      const free = !past && courtsOf(c, sport).filter((ct) => isFree(bookings, c, sport, ct.id, date, h, dur)).length
+      out.push({ h, past, free })
+    }
+    return out
+  }, [bookings, c.id, sport, date, dur])
+  const freeCount = slots.filter((x) => x.free).length
+  const pick = (p) => { haptic(6); set({ ...p, start: null }) }
+  return (
+    <div className="book-box">
+      {title && <h2>{title}</h2>}
+      <div className="bx-days">
+        {days.map((d) => {
+          const k = dayKey(d)
+          return (
+            <button key={k} className={date === k ? 'on' : ''} onClick={() => pick({ date: k })}>
+              <small>{dayLabel(d)}</small><b>{dayNum(d)}</b>
+            </button>
+          )
+        })}
+      </div>
+      <div className="bx-dur">
+        <span>مدت</span>
+        {[1, 2, 3].map((n) => <button key={n} className={dur === n ? 'on' : ''} onClick={() => pick({ dur: n })}>{fa(n)} ساعت</button>)}
+      </div>
+      <div className="bx-hours">
+        {slots.map(({ h, past, free }) => (
+          <motion.button key={h} whileTap={free ? { scale: 0.92 } : {}} disabled={!free}
+            className={`${start === h ? 'on' : ''} ${isPeak(date, h) ? 'peak' : ''} ${past ? 'past' : ''}`}
+            onClick={() => { haptic(8); set({ start: start === h ? null : h }) }}>
+            <b>{hourLabel(h)}</b>
+            <small>{free ? short(priceFor(c, sport, date, h, 1)) : past ? 'گذشته' : 'پر'}</small>
+          </motion.button>
+        ))}
+      </div>
+      <p className="bx-note">{freeCount ? <>{fa(freeCount)} ساعت شروع آزاد، {dayLabel(date)} {weekday(fromKey(date))}. ساعت‌های خط‌دار پیک‌اند.</> : 'این روز پره؛ روز دیگه‌ای رو ببین.'}</p>
+    </div>
   )
 }

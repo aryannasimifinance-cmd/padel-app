@@ -322,7 +322,7 @@ export function Success({ r, nav }) {
       ))}
       <div className="succ-cta">
         <Button full onClick={() => nav.done('trips')} icon="cal">رزروهای من</Button>
-        <Button full variant="line" onClick={() => nav.done('explore')}>ادامه‌ی کاوش</Button>
+        <Button full variant="line" onClick={() => nav.done('court')}>ادامه‌ی کاوش</Button>
       </div>
     </div>
   )

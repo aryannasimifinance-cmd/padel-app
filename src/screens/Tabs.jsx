@@ -26,7 +26,7 @@ export function Matches({ nav }) {
       {!list.length && (
         <>
           <Empty text={tab === 'up' ? 'هنوز رزروی نداری. اولین زمینت رو بگیر!' : 'تاریخچه‌ای نیست.'} />
-          {tab === 'up' && <Button full icon="search" onClick={() => nav.tab('explore')}>پیدا کردن زمین</Button>}
+          {tab === 'up' && <Button full icon="search" onClick={() => nav.tab('court')}>پیدا کردن زمین</Button>}
         </>
       )}
       <motion.div className="tline" variants={stagger} initial="hidden" animate="show" key={tab}>
