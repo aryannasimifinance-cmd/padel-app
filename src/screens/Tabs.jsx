@@ -1,9 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState } from 'react'
-import { BADGES, CITIES, CREDITS, SPORTS, clubById, dayLabel, dayMonth, fa, fromKey, hash, hourLabel, levelById, levelOf, range, rankOf, sportById, toman } from '../data'
+import { BADGES, CITIES, CREDITS, LEVELS, SPORTS, clubById, dayLabel, dayMonth, dayNum, fa, fromKey, hash, hourLabel, levelById, levelOf, range, rankOf, sportById, toman } from '../data'
 import { askNotifyPermission, chime, haptic } from '../fx'
 import { useStore } from '../store'
-import { Avatar, Button, Chips, Empty, Icon, LevelPill, Photo, SecHead, Sheet, TopBar, rise, stagger } from '../components/ui'
+import { Avatar, Button, Chips, CountUp, Empty, Icon, LevelPill, Photo, Sheet, TopBar, rise, stagger } from '../components/ui'
+import { CourtArt } from '../components/Art'
+import { Head } from './Home'
 import LevelQuiz from './LevelQuiz'
 
 const KIND = { court: 'رزرو زمین', open: 'بازی باز', join: 'بازی باز', coach: 'کلاس مربی', event: 'مسابقه' }
@@ -28,8 +30,15 @@ export function Matches({ nav }) {
           {tab === 'up' && <Button full icon="plus" onClick={() => nav.start({})}>رزرو جدید</Button>}
         </>
       )}
-      <motion.div className="bookings" variants={stagger} initial="hidden" animate="show" key={tab}>
-        {list.map((b) => <BookingCard key={b.id} b={b} onClick={() => setSel(b.id)} />)}
+      <motion.div className="tline" variants={stagger} initial="hidden" animate="show" key={tab}>
+        {[...new Set(list.map((b) => b.date))].map((date) => (
+          <motion.div key={date} variants={rise} className="tl-day">
+            <div className="tl-date"><b>{dayNum(fromKey(date))}</b><small>{dayLabel(date)}</small></div>
+            <div className="tl-items">
+              {list.filter((b) => b.date === date).map((b) => <BookingCard key={b.id} b={b} onClick={() => setSel(b.id)} />)}
+            </div>
+          </motion.div>
+        ))}
       </motion.div>
       <Sheet open={!!cur} onClose={() => setSel(null)} title={cur ? `${cur.title || KIND[cur.kind]}، ${sportById(cur.sport).name}` : ''}>
         {cur && (
@@ -73,15 +82,14 @@ export function Matches({ nav }) {
 }
 
 function BookingCard({ b, onClick }) {
-  const s = sportById(b.sport), c = clubById(b.clubId), d = fromKey(b.date)
+  const s = sportById(b.sport), c = clubById(b.clubId)
   const empty = b.players?.filter((p) => !p.name).length || 0
   return (
-    <motion.button variants={rise} className="bk" whileTap={{ scale: 0.98 }} onClick={onClick} style={{ '--c': s.color }}>
-      <div className="bk-date"><b>{dayMonth(d)}</b><small>{dayLabel(d)}</small></div>
+    <motion.button className="bk" whileTap={{ scale: 0.98 }} onClick={onClick} style={{ '--c': s.color }}>
       <div className="bk-body">
-        <div className="bk-tags"><span className="sp">{s.name}</span><span>{KIND[b.kind]}</span>{b.series && <span>پکیج</span>}</div>
+        <div className="bk-tags"><span className="sp"><i />{s.name}</span><span>{KIND[b.kind]}</span>{b.series && <span>پکیج</span>}</div>
         <b>{b.title || c.name}</b>
-        <p className="muted">{range(b.start, b.dur)}، {b.coachName || `${c.area}، زمین ${fa(b.court)}`}</p>
+        <p className="muted">{b.coachName || `${c.area}، زمین ${fa(b.court)}`}</p>
         {b.players?.length > 1 && (
           <div className="mini-av">
             {b.players.map((p, k) => (p.name ? <Avatar key={k} name={p.name} me={p.me} size={22} /> : <span key={k} className="mini-empty" />))}
@@ -90,6 +98,7 @@ function BookingCard({ b, onClick }) {
           </div>
         )}
       </div>
+      <div className="bk-time"><b>{hourLabel(b.start)}</b><small>{fa(b.dur)} ساعت</small></div>
     </motion.button>
   )
 }
@@ -147,6 +156,9 @@ function ago(t) {
 }
 
 // ---------- پروفایل ----------
+const LADDER = [...LEVELS].reverse()
+const QUIZ_TOP = LADDER.findIndex((l) => l.id === 'B')
+
 export function Profile() {
   const { user, xp, wallet, badges, bookings, logout, updateUser, setLevel, topUp, toast } = useStore()
   const rank = rankOf(xp)
@@ -154,72 +166,121 @@ export function Profile() {
   const [credits, setCredits] = useState(false)
   const mine = bookings.filter((b) => b.status !== 'cancelled')
   const hours = mine.reduce((s, b) => s + (b.dur || 1), 0)
-  const board = Array.from({ length: 7 }, (_, k) => ({ name: ['آرمان ط.', 'سارا ک.', 'کیان م.', 'الناز ر.', 'پویا ن.', 'هستی ص.', 'سینا ج.'][k], xp: Math.floor(200 + hash('lb' + user.city + k) * 1600) }))
+  const clubs = new Set(mine.map((b) => b.clubId)).size
+  const cityName = CITIES.find((c) => c.id === user.city).name
+  const board = Array.from({ length: 9 }, (_, k) => ({ name: ['آرمان ط.', 'سارا ک.', 'کیان م.', 'الناز ر.', 'پویا ن.', 'هستی ص.', 'سینا ج.', 'نیلوفر ا.', 'بردیا ش.'][k], xp: Math.floor(200 + hash('lb' + user.city + k) * 1600) }))
     .concat({ name: user.name, xp, me: true }).sort((a, b) => b.xp - a.xp)
+  const myPos = board.findIndex((p) => p.me)
   const sports = user.sports?.length ? user.sports : ['padel']
+  const R = 46, C = 2 * Math.PI * R
 
   return (
     <div className="page profile">
-      <motion.div className="pf-head" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <Avatar name={user.name} size={80} me />
-        <h1>{user.name}</h1>
-        <p className="muted">{CITIES.find((c) => c.id === user.city).name}، {rank.name}</p>
-        <div className="xpbar"><motion.i initial={{ width: 0 }} animate={{ width: `${rank.progress * 100}%` }} transition={{ duration: 1.1, delay: 0.2 }} /></div>
-        <small className="muted">{rank.next ? `${fa(xp)} / ${fa(rank.next.xp)} تا «${rank.next.name}»` : 'به اوج رسیدی!'}</small>
+      <motion.div className="pcard" initial={{ opacity: 0, rotate: -5, y: 30 }} animate={{ opacity: 1, rotate: -1.5, y: 0 }} transition={{ type: 'spring', stiffness: 140, damping: 16 }}>
+        <CourtArt className="pcard-art" balls={false} bounce={false} />
+        <div className="pc-top"><span dir="ltr">MATCHY PLAYER</span><span>{cityName}</span></div>
+        <div className="pc-id">
+          <div className="pc-ring">
+            <svg viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r={R} className="trk" />
+              <motion.circle cx="50" cy="50" r={R} className="val" strokeDasharray={C} initial={{ strokeDashoffset: C }}
+                animate={{ strokeDashoffset: C * (1 - rank.progress) }} transition={{ delay: 0.3, duration: 1.2 }} />
+            </svg>
+            <Avatar name={user.name} size={66} me />
+          </div>
+          <div className="grow">
+            <h1>{user.name}</h1>
+            <span className="pc-rank">{rank.name}</span>
+            <small>{rank.next ? `${fa(rank.next.xp - xp)} امتیاز تا «${rank.next.name}»` : 'به اوج رسیدی!'}</small>
+          </div>
+        </div>
+        <div className="pc-lv">
+          {sports.map((id) => (
+            <button key={id} onClick={() => setQuiz(id)} style={{ '--c': sportById(id).color }}>
+              <small><i />{sportById(id).name}</small><b dir="ltr">{levelOf(user, id)}</b>
+            </button>
+          ))}
+        </div>
       </motion.div>
 
-      <div className="wallet">
+      <div className="nums">
+        {[{ n: mine.length, t: 'رزرو' }, { n: hours, t: 'ساعت بازی' }, { n: clubs, t: 'باشگاه' }, { n: xp, t: 'امتیاز' }].map((s, k) => (
+          <motion.div key={s.t} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + k * 0.06 }}><b><CountUp to={s.n} /></b><small>{s.t}</small></motion.div>
+        ))}
+      </div>
+
+      <div className="wallet-line">
         <Icon name="wallet" />
-        <div className="grow"><small>کیف پول</small><b>{toman(wallet)}</b></div>
-        <Button variant="lime" onClick={() => { topUp(500000); chime('success'); toast({ icon: '💳', title: '۵۰۰ هزار تومان شارژ شد' }) }}>شارژ</Button>
+        <span className="grow">کیف پول <b>{toman(wallet)}</b></span>
+        <button className="link" onClick={() => { topUp(500000); chime('success'); toast({ icon: '💳', title: '۵۰۰ هزار تومان شارژ شد' }) }}>+ شارژ</button>
       </div>
 
-      <div className="stats">
-        {[{ n: mine.length, t: 'رزرو' }, { n: hours, t: 'ساعت بازی' }, { n: xp, t: 'امتیاز' }, { n: badges.length, t: 'نشان' }].map((s, k) => (
-          <motion.div key={s.t} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + k * 0.06 }}><b>{fa(s.n)}</b><small>{s.t}</small></motion.div>
-        ))}
-      </div>
+      <section>
+        <Head title="پلکان سطح من"><small className="muted">برای تعیین دوباره بزن</small></Head>
+        <div className="ladders">
+          {sports.map((id) => {
+            const s = sportById(id), cur = LADDER.findIndex((l) => l.id === levelOf(user, id))
+            return (
+              <button key={id} className="ladder" style={{ '--c': s.color }} onClick={() => setQuiz(id)}>
+                <div className="ld-head"><b>{s.name}</b><span>{LADDER[cur].title}</span><Icon name="edit" size={15} /></div>
+                <div className="ld-steps">
+                  {LADDER.map((l, k) => (
+                    <motion.span key={l.id} className={`${k <= cur ? 'on' : ''} ${k === cur ? 'me' : ''} ${k > QUIZ_TOP ? 'lock' : ''}`}
+                      style={{ height: 16 + k * 7 }} initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ delay: 0.1 + k * 0.04 }}>
+                      <em dir="ltr">{l.id}</em>
+                    </motion.span>
+                  ))}
+                </div>
+              </button>
+            )
+          })}
+          <p className="ld-note"><i /> پله‌های بالاتر از B فقط با نتیجه‌ی مسابقه باز می‌شن.</p>
+        </div>
+      </section>
 
-      <SecHead n={1} title="سطح من در هر رشته" />
-      <div className="pf-levels">
-        {sports.map((id) => {
-          const s = sportById(id), l = levelOf(user, id)
-          return (
-            <button key={id} className="pf-lv" style={{ '--c': s.color }} onClick={() => setQuiz(id)}>
-              <i /><div className="grow"><b>{s.name}</b><small>{levelById(l).title}</small></div>
-              <LevelPill id={l} big /><Icon name="edit" size={16} />
-            </button>
-          )
-        })}
-      </div>
+      <section>
+        <Head title={`جایگاه من در ${cityName}`}><small className="muted">این ماه</small></Head>
+        <div className="podium">
+          {[1, 0, 2].map((k) => (
+            <div key={k} className={`pd-col ${board[k].me ? 'me' : ''}`}>
+              <Avatar name={board[k].name} size={k === 0 ? 52 : 42} me={board[k].me} />
+              <b>{board[k].me ? 'شما' : board[k].name}</b>
+              <small>{fa(board[k].xp)}</small>
+              <motion.span className="pd-block" initial={{ height: 0 }} animate={{ height: [96, 70, 54][k] }}
+                transition={{ delay: 0.2 + k * 0.12, type: 'spring', stiffness: 120, damping: 14 }}>{fa(k + 1)}</motion.span>
+            </div>
+          ))}
+        </div>
+        <div className="ranks">
+          {board.slice(3).map((p, k) => (
+            <div key={p.name} className={`rk-row ${p.me ? 'me' : ''}`}>
+              <span className="rk-n">{fa(k + 4)}</span>
+              <span className="grow">{p.me ? 'شما' : p.name}</span>
+              <b>{fa(p.xp)}</b>
+            </div>
+          ))}
+        </div>
+        {myPos > 0 && <p className="rk-gap">{fa(board[myPos - 1].xp - xp + 1)} امتیاز دیگه تا جایگاه {fa(myPos)} 🔥</p>}
+      </section>
 
-      <SecHead n={2} title="نشان‌ها"><small className="muted">{fa(badges.length)} از {fa(BADGES.length)}</small></SecHead>
-      <div className="badges">
-        {BADGES.map((b, k) => {
-          const on = badges.includes(b.id)
-          return (
-            <motion.div key={b.id} className={`badge ${on ? 'on' : ''}`} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: k * 0.03 }}>
-              <span className={`badge-ic ${on ? 'on' : ''}`}>{on ? b.icon : '🔒'}</span>
-              <b>{b.name}</b>
-              <small>{b.desc}</small>
-            </motion.div>
-          )
-        })}
-      </div>
+      <section>
+        <Head title="نشان‌ها"><small className="muted">{fa(badges.length)} از {fa(BADGES.length)}</small></Head>
+        <div className="stickers">
+          {BADGES.map((b, k) => {
+            const on = badges.includes(b.id)
+            return (
+              <motion.button key={b.id} className={`sticker ${on ? 'on' : ''}`} style={{ '--r': `${((hash(b.id) - 0.5) * 16).toFixed(1)}deg` }}
+                initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: k * 0.03, type: 'spring', stiffness: 260, damping: 16 }}
+                onClick={() => toast({ icon: on ? b.icon : '🔒', title: b.name, body: b.desc })}>
+                <span>{on ? b.icon : '?'}</span>
+                <small>{b.name}</small>
+              </motion.button>
+            )
+          })}
+        </div>
+      </section>
 
-      <SecHead n={3} title={`جدول ${CITIES.find((c) => c.id === user.city).name} این ماه`} />
-      <div className="board">
-        {board.map((p, k) => (
-          <div key={p.name} className={`board-row ${p.me ? 'me' : ''}`}>
-            <span className="board-n">{k < 3 ? ['🥇', '🥈', '🥉'][k] : fa(k + 1)}</span>
-            <Avatar name={p.name} size={30} me={p.me} />
-            <span className="grow">{p.me ? 'شما' : p.name}</span>
-            <b>{fa(p.xp)}</b>
-          </div>
-        ))}
-      </div>
-
-      <SecHead n={4} title="تنظیمات" />
+      <Head title="تنظیمات" />
       <div className="settings">
         <div className="set-row"><span>شهر</span><Chips id="pc" small options={CITIES.map((c) => ({ id: c.id, name: c.name }))} value={user.city} onChange={(city) => updateUser({ city })} /></div>
         <div className="set-row col"><span>رشته‌های من</span>
